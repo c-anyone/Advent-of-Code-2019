@@ -55,21 +55,29 @@ fn main() {
     // let mut buf = String::from("1,9,10,3,2,3,11,0,99,30,40,50");
     let mut program_data = parse_program(&buf);
 
-    let mut ga = GravityAssist::new(&program_data);
-    println!("{:?}", ga.state);
-    while ga.exec_step() != None {
-        println!("{}:{}", ga.pc, ga.current_instruction());
+    let mut ga = IntCodeProgram::new(&program_data);
+    // println!{"The Result is {}", ga.run()};
+    
+    'outer: for noun in 0 .. 99 {
+        for verb in 0 .. 99 {
+            if ga.run_with(noun, verb) == 19690720 {
+                println!("Found solution at {} {}", noun, verb);
+                println!("Answer is {}", 100*noun + verb);
+                break 'outer;
+            }
+            ga.reset();
+        }
     }
 
-    print!("{:?}", ga.state);
 }
 
-struct GravityAssist {
+struct IntCodeProgram {
+    initial_state: Vec<u32>,
     state: Vec<u32>,
     pc: usize,
 }
 
-impl GravityAssist {
+impl IntCodeProgram {
     pub fn current_instruction(&self) -> String {
         let x = String::from(format!("{:?}", self.parse_current_instruction()));
         x
@@ -93,7 +101,6 @@ impl GravityAssist {
                 Some(())
             }
             Opcode::Stop => {
-                println!("Stop Code");
                 None
             }
             Opcode::Err => {
@@ -102,11 +109,28 @@ impl GravityAssist {
             }
         };
         self.pc += 4;
-        if self.pc >= self.state.len() - 3 {
-            self.pc = self.state.len() - 3;
+        if self.pc >= self.state.len() {
+            self.pc = 0;
             ret = None;
         }
         ret
+    }
+
+    pub fn run(&mut self) -> u32 {
+        while self.exec_step() != None{};
+        self.state[0]
+    }
+
+    pub fn run_with(&mut self, noun: u32, verb: u32) -> u32 {
+        self.state[1] = noun;
+        self.state[2] = verb;
+        self.pc = 0;
+        self.run()
+    }
+
+    pub fn reset(&mut self) {
+        self.state = self.initial_state.clone();
+        self.pc = 0;
     }
 
     fn parse_current_instruction(&self) -> Option<IntCode> {
@@ -115,7 +139,7 @@ impl GravityAssist {
         }
         let slice = &self.state[self.pc..self.pc + 4];
 
-        IntCode::try_from(slice);
+        IntCode::from(slice);
         match IntCode::try_from(slice) {
             Ok(x) => Some(x),
             Err(_) => None,
@@ -147,9 +171,10 @@ impl GravityAssist {
     pub fn new(data: &Vec<u8>) -> Self {
         // let test = data.iter();
         let state: Vec<u32> = data.iter().map(|x| *x as u32).collect();
-        GravityAssist {
+        IntCodeProgram {
+            initial_state: state.clone(),
             state: state.to_owned(),
-            // instructions: GravityAssist::parse_instructions(data).unwrap(),
+            // instructions: IntCodeProgram::parse_instructions(data).unwrap(),
             pc: 0,
         }
     }
