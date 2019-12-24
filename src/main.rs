@@ -2,13 +2,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 
-mod IntCode;
-use IntCode::int_code::*;
-
-
-fn parse_program(input: &str) -> Vec<u8> {
-    input.split(',').map(|s| s.parse::<u8>().unwrap()).collect()
-}
+mod int_code;
+use int_code::*;
 
 
 fn main() {
