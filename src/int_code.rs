@@ -5,19 +5,9 @@ pub fn parse_program(input: &str) -> Vec<u8> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Opcode {
-    Add,
-    Mult,
-    Stop,
-    Input,
-    Output,
-    Err,
-}
-
-#[derive(Debug, PartialEq)]
 pub enum Parameter {
-    Positional(isize),
-    Immediate(isize),
+    Positional,
+    Immediate,
 }
 
 #[derive(Debug)]
@@ -27,6 +17,28 @@ pub struct IntCode {
     in2: usize,
     out: usize,
 }
+
+impl From<&[u32]> for IntCode {
+    fn from(x: &[u32]) -> Self {
+        IntCode {
+            opcode: Opcode::from(x[0]),
+            in1: x[1] as usize,
+            in2: x[2] as usize,
+            out: x[3] as usize,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Opcode {
+    Add,
+    Mult,
+    Stop,
+    Input,
+    Output,
+    Err,
+}
+
 impl From<u32> for Opcode {
     fn from(x: u32) -> Self {
         let op = if x > 99 { x % 100 } else { x };
@@ -38,17 +50,6 @@ impl From<u32> for Opcode {
             4 => Opcode::Output,
             99 => Opcode::Stop,
             _ => Opcode::Err,
-        }
-    }
-}
-
-impl From<&[u32]> for IntCode {
-    fn from(x: &[u32]) -> Self {
-        IntCode {
-            opcode: Opcode::from(x[0]),
-            in1: x[1] as usize,
-            in2: x[2] as usize,
-            out: x[3] as usize,
         }
     }
 }
@@ -124,10 +125,9 @@ impl IntCodeProgram {
     }
 
     fn parse_current_instruction(&self) -> Option<IntCode> {
-        if self.state.len() - self.pc < 3 {
-            return None;
-        }
-        let slice = &self.state[self.pc..self.pc + 4];
+        let op: Opcode = self.state[self.pc].into();
+
+        let slice = &self.state[self.pc..self.pc + op.len()];
 
         // IntCode::from(slice);
         match IntCode::try_from(slice) {
@@ -145,6 +145,92 @@ impl IntCodeProgram {
             // instructions: IntCodeProgram::parse_instructions(data).unwrap(),
             pc: 0,
         }
+    }
+}
+
+mod int_code_computer {
+    #[derive(Debug, Clone, Copy)]
+    pub enum Param {
+        Positional,
+        Immediate,
+        Invalid,
+    }
+
+
+    #[derive(Debug)]
+    pub enum Opcode {
+        Add { in1: Param, in2: Param, out: Param },
+        Mult { in1: Param, in2: Param, out: Param },
+        Stop,
+        Input(Param),
+        Output(Param),
+        Err,
+    }
+    trait ParseParam {
+        fn parse_params(input: u32);
+    }
+
+    impl From<u32> for Opcode {
+        fn from(x: u32) -> Self {
+            let op = if x > 99 { x % 100 } else { x };
+            let param = x / 100;
+
+            let mut result: Vec<Param> = Vec::with_capacity(3);
+
+            for _ in 0..2 {
+                result.push(match param % 10 {
+                    0 => Param::Positional,
+                    1 => Param::Immediate,
+                    _ => Param::Invalid,
+                });
+            }
+
+            result.reverse();
+            let mut x = result.iter();
+
+            match op {
+                1 => Opcode::Add {
+                    in1: *x.next().unwrap(),
+                    in2: *x.next().unwrap(),
+                    out: *x.next().unwrap(),
+                },
+                2 => Opcode::Mult {
+                    in1: *x.next().unwrap(),
+                    in2: *x.next().unwrap(),
+                    out: *x.next().unwrap(),
+                },
+                3 => {
+                    Opcode::Input(*x.next().unwrap())
+                },
+                4 => {
+                    Opcode::Output(*x.next().unwrap())
+                },
+                99 => Opcode::Stop,
+                _ => Opcode::Err,
+            }
+        }
+    }
+    impl Opcode {
+        pub fn len(&self) -> usize {
+            match self {
+                Opcode::Add{in1: _,in2: _,out: _} => 4,
+                Opcode::Mult{in1: _,in2: _,out: _} => 4,
+                Opcode::Input(_) => 2,
+                Opcode::Output(_) => 2,
+                Opcode::Stop => 1,
+                Opcode::Err => 0,
+            }
+        }
+    }
+
+    struct IntComputer {
+        initial_state: Vec<u32>,
+        satate: Vec<u32>,
+        pc: usize,
+        in1: isize,
+        in2: isize,
+        out: isize,
+        op: Opcode,
     }
 }
 

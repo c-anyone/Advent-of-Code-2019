@@ -1,10 +1,10 @@
+#![feature(test)]
+extern crate test;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-
 mod int_code;
 use int_code::*;
-
 
 fn main() {
     let reader = BufReader::new(File::open("input.txt").expect("File not found!"));
@@ -32,3 +32,49 @@ fn main() {
     }
 }
 
+mod tests {
+    use test::Bencher;
+
+    #[derive(Debug, PartialEq)]
+    pub enum Parameter {
+        Positional,
+        Immediate,
+        Invalid,
+    }
+
+    #[bench]
+    fn bench_string(b: &mut Bencher) {
+        b.iter(|| {
+            let iter = (0..999).into_iter();
+            for i in iter {
+                let s = format!("{:03}", i);
+                for val in s.chars() {
+                    match val {
+                        '0' => Parameter::Positional,
+                        '1' => Parameter::Immediate,
+                        _ => Parameter::Invalid,
+                    };
+                }
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_modulo(b: &mut Bencher) {
+        b.iter(|| {
+            let iter = (0..999).into_iter();
+            for i in iter {
+                let mut result = vec![Parameter::Invalid, Parameter::Invalid, Parameter::Invalid];
+                let mut val = i;
+                for j in 0..2 {
+                    result[j] = match val % 10 {
+                        0 => Parameter::Positional,
+                        1 => Parameter::Immediate,
+                        _ => Parameter::Invalid
+                    };
+                    val = val / 10;
+                }
+            }
+        });
+    }
+}
