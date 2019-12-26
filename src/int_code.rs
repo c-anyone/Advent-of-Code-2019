@@ -13,8 +13,9 @@ impl IntComputer {
             initial_state: data.clone(),
             state: data.clone(),
             pc: 0,
-            register: [0, 0, 0],
+            in_reg: [0, 0, 0],
             op: Opcode::Err,
+            out: 0,
         }
     }
 
@@ -60,34 +61,36 @@ impl IntComputer {
         };
         let result = match self.op {
             Opcode::Add(params) => {
-                let input_iter = self.state.iter().skip(self.pc + 1).take(3);
-                let reg_iter = self.register.iter_mut();
-                let iter = multizip((input_iter, reg_iter, params.iter()));
+                let input_iter = self.state.iter().skip(self.pc + 1).take(2);
+                let reg_iter = self.in_reg.iter_mut().take(2);
+                let iter = multizip((input_iter, reg_iter, params.iter().take(2)));
 
                 for (&inp, reg, &param) in iter {
                     let val = IntComputer::load_param(&self.state, inp as isize, param)?;
                     *reg = val;
                 }
+                self.out = *self.state.get(self.pc + 3).unwrap() as usize;
                 self.store_result(
-                    self.register[0] + self.register[1],
+                    self.in_reg[0] + self.in_reg[1],
                     params[2],
-                    self.register[2] as usize,
+                    self.out as usize,
                 )?;
                 Ok(())
             }
             Opcode::Mult(params) => {
-                let input_iter = self.state.iter().skip(self.pc + 1).take(3);
-                let reg_iter = self.register.iter_mut();
-                let iter = multizip((input_iter, reg_iter, params.iter()));
+                let input_iter = self.state.iter().skip(self.pc + 1).take(2);
+                let reg_iter = self.in_reg.iter_mut().take(2);
+                let iter = multizip((input_iter, reg_iter, params.iter().take(2)));
 
                 for (&inp, reg, &param) in iter {
                     let val = IntComputer::load_param(&self.state, inp as isize, param)?;
                     *reg = val;
                 }
+                self.out = *self.state.get(self.pc + 3).unwrap() as usize;
                 self.store_result(
-                    self.register[0] * self.register[1],
+                    self.in_reg[0] * self.in_reg[1],
                     params[2],
-                    self.register[2] as usize,
+                    self.out as usize,
                 )?;
                 Ok(())
             }
@@ -215,7 +218,8 @@ pub struct IntComputer {
     initial_state: Vec<i32>,
     state: Vec<i32>,
     pc: usize,
-    register: [i32; 3],
+    in_reg: [i32; 3],
+    out: usize,
     op: Opcode,
 }
 
