@@ -34,9 +34,9 @@ impl IntComputer {
         }
     }
 
-    fn load_param(&self, value: isize, param: Param) -> Result<i32, String> {
+    fn load_param(state: &Vec<i32>, value: isize, param: Param) -> Result<i32, String> {
         match param {
-            Param::Positional => match self.state.get(value as usize) {
+            Param::Positional => match state.get(value as usize) {
                 Some(&p) => Ok(p),
                 None => Err(format!("Index {} out of Bounds", value)),
             },
@@ -47,10 +47,7 @@ impl IntComputer {
 
     fn store_result(&mut self, value: i32, param: Param, location: usize) -> Result<(), String> {
         if location > self.state.len() {
-            return Err(format!(
-                "Failed to store value@location: {}@{}",
-                value, location
-            ));
+            return Err(format!("Failed to store {}  @{}", value, location));
         }
         self.state[location] = value;
         Ok(())
@@ -63,17 +60,13 @@ impl IntComputer {
         };
         let result = match self.op {
             Opcode::Add(params) => {
-                let input_iter = self.state.iter().skip(self.pc).take(3);
+                let input_iter = self.state.iter().skip(self.pc + 1).take(3);
                 let reg_iter = self.register.iter_mut();
                 let iter = multizip((input_iter, reg_iter, params.iter()));
 
                 for (&inp, reg, &param) in iter {
-                    // *reg = self.load_param(inp as isize, param)?;
-                    *reg = match param {
-                        Param::Positional => *(self.state.get(inp as usize).unwrap()),
-                        Param::Immediate => inp,
-                        Param::Invalid => return Err(format!("Invalid Parameter at {}", self.pc)),
-                    };
+                    let val = IntComputer::load_param(&self.state, inp as isize, param)?;
+                    *reg = val;
                 }
                 self.store_result(
                     self.register[0] + self.register[1],
@@ -83,17 +76,13 @@ impl IntComputer {
                 Ok(())
             }
             Opcode::Mult(params) => {
-                let input_iter = self.state.iter().skip(self.pc).take(3);
+                let input_iter = self.state.iter().skip(self.pc + 1).take(3);
                 let reg_iter = self.register.iter_mut();
                 let iter = multizip((input_iter, reg_iter, params.iter()));
 
                 for (&inp, reg, &param) in iter {
-                    // *reg = self.load_param(inp as isize, param)?;
-                    *reg = match param {
-                        Param::Positional => *(self.state.get(inp as usize).unwrap()),
-                        Param::Immediate => inp,
-                        Param::Invalid => return Err(format!("Invalid Parameter at {}", self.pc)),
-                    };
+                    let val = IntComputer::load_param(&self.state, inp as isize, param)?;
+                    *reg = val;
                 }
                 self.store_result(
                     self.register[0] * self.register[1],
@@ -111,7 +100,7 @@ impl IntComputer {
                 println!(
                     "Value at {}: {}",
                     self.pc + 1,
-                    self.load_param(index as isize, Param::Immediate)?
+                    IntComputer::load_param(&self.state, index as isize, Param::Immediate)?
                 );
                 Ok(())
             } /* Output to the console */
@@ -142,7 +131,7 @@ impl IntComputer {
     pub fn get(&self, index: usize) -> Option<i32> {
         match self.state.get(index) {
             Some(x) => Some(*x),
-            None => None
+            None => None,
         }
     }
 }
