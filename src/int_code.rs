@@ -184,7 +184,7 @@ mod int_code_computer {
             }
         }
 
-        fn store_param(&mut self, value: i32, location: isize) -> Result<(), String> {
+        fn store_result(&mut self, value: i32, location: isize) -> Result<(), String> {
             match self.state.iter_mut().skip(location as usize).next() {
                 Some(x) => {
                     *x = value;
@@ -207,6 +207,9 @@ mod int_code_computer {
                     let mut iter = self.state.iter().skip(self.pc).take(3);
                     self.in1 = self.load_param(*(iter.next().unwrap()) as isize, in1)?;
                     self.in2 = self.load_param(*(iter.next().unwrap()) as isize, in2)?;
+                    self.out = self.in1 + self.in2;
+                    let out_location = self.load_param(*(iter.next().unwrap() as isize, _out));
+                    self.store_param(self.out, *(iter.next().unwrap()) as isize)?;
                     Ok(())
                 }
                 Opcode::Mult(in1, in2, _out) => {
@@ -292,8 +295,8 @@ mod int_code_computer {
 
     #[derive(Debug, Clone)]
     pub enum Opcode {
-        Add(Param, Param, Param),
-        Mult(Param, Param, Param),
+        Add([Param; 3]),
+        Mult([Param; 3]),
         Stop,
         Input,
         Output,
