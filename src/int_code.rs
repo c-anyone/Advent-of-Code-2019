@@ -1,3 +1,4 @@
+extern crate itertools;
 use itertools::multizip;
 use std::convert::TryFrom;
 
@@ -55,7 +56,7 @@ impl IntComputer {
         Ok(())
     }
 
-    fn execute_loaded_instruction(&mut self) -> Result<Opcode, String> {
+    fn execute_instruction(&mut self) -> Result<Opcode, String> {
         self.op = match self.load_instruction_at_pc() {
             Ok(op) => op,
             Err(e) => return Err(e),
@@ -129,7 +130,20 @@ impl IntComputer {
             }
             Err(x) => Err(x),
         }
-        // Err(format!("Fuck"))
+    }
+
+    pub fn step(&mut self) -> Result<bool, String> {
+        match self.execute_instruction()? {
+            Opcode::Stop => Ok(false),
+            _ => Ok(true),
+        }
+    }
+
+    pub fn get(&self, index: usize) -> Option<i32> {
+        match self.state.get(index) {
+            Some(x) => Some(*x),
+            None => None
+        }
     }
 }
 
@@ -150,6 +164,16 @@ pub enum Param {
     Invalid,
 }
 
+impl From<i32> for Param {
+    fn from(val: i32) -> Self {
+        match val {
+            0 => Param::Positional,
+            1 => Param::Immediate,
+            _ => Param::Invalid,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Opcode {
     Add([Param; 3]),
@@ -167,31 +191,17 @@ trait ParseParam {
 impl From<i32> for Opcode {
     fn from(x: i32) -> Self {
         let op = if x > 99 { x % 100 } else { x };
-        let param = x / 100;
+        let mut param = x / 100;
 
-        let mut result: Vec<Param> = Vec::with_capacity(3);
-
-        for _ in 0..2 {
-            result.push(match param % 10 {
-                0 => Param::Positional,
-                1 => Param::Immediate,
-                _ => Param::Invalid,
-            });
+        let mut array = [Param::Invalid; 3];
+        for i in 0..3 {
+            array[2 - i] = (param % 10).into();
+            param /= 10;
         }
 
-        result.reverse();
-
         match op {
-            1 => {
-                let mut array = [Param::Invalid; 3];
-                array.copy_from_slice(&result);
-                Opcode::Add(array)
-            }
-            2 => {
-                let mut array = [Param::Invalid; 3];
-                array.copy_from_slice(&result);
-                Opcode::Mult(array)
-            }
+            1 => Opcode::Add(array),
+            2 => Opcode::Mult(array),
             3 => Opcode::Input,
             4 => Opcode::Output,
             99 => Opcode::Stop,

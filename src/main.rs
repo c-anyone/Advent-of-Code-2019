@@ -1,8 +1,8 @@
 #![feature(test)]
 extern crate test;
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::convert::TryFrom;
 
 mod int_code;
 use int_code::*;
@@ -16,10 +16,20 @@ fn main() {
         buf.push_str(&line);
     }
 
-    let mut int_computer: int_code::IntComputer = int_code::IntComputer::try_from(buf.as_str()).unwrap();
+    let mut int_computer: int_code::IntComputer =
+        IntComputer::try_from(buf.as_str()).unwrap();
 
-    while int_computer.load_instruction_at_pc()
+    loop {
+        let x = int_computer.step();
+        match x {
+            Ok(true) => continue,
+            Ok(false) => (),
+            Err(x) => println!("Execution halted with an Error {}", x),
+        };
+        break;
+    }
 
+    println!("Execution resulted in {}", int_computer.get(0).unwrap());
     // let mut buf = String::from("1,9,10,3,2,3,11,0,99,30,40,50");
     // let program_data = parse_program(&buf).unwrap();
 
@@ -76,7 +86,7 @@ mod tests {
                     result[j] = match val % 10 {
                         0 => Parameter::Positional,
                         1 => Parameter::Immediate,
-                        _ => Parameter::Invalid
+                        _ => Parameter::Invalid,
                     };
                     val = val / 10;
                 }
