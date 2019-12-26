@@ -30,7 +30,7 @@ fn main() {
         break;
     }
 
-    println!("Execution resulted in {}", int_computer.get(0).unwrap());
+    // println!("Execution resulted in {}", int_computer.get(0).unwrap());
     // let program_data = parse_program(&buf).unwrap();
 
     // let mut ga = IntCodeProgram::new(&program_data);

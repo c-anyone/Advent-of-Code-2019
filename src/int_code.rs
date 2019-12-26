@@ -38,11 +38,11 @@ impl IntComputer {
 
     fn load_param(state: &Vec<i32>, value: isize, param: Param) -> Result<i32, String> {
         match param {
-            Param::Positional => match state.get(value as usize) {
+            Param::Pos => match state.get(value as usize) {
                 Some(&p) => Ok(p),
                 None => Err(format!("Index {} out of Bounds", value)),
             },
-            Param::Immediate => Ok(value as i32),
+            Param::Imm => Ok(value as i32),
             Param::Invalid => Err(format!("Illegal param, value {}", value)),
         }
     }
@@ -51,7 +51,7 @@ impl IntComputer {
         if self.out > self.state.len() {
             return Err(format!("Failed to store {}  @{}", value, self.out));
         }
-        println!("    Stored {} @ {}", value, self.out);
+        // println!("    Stored {} @ {}", value, self.out);
         self.state[self.out] = value;
         Ok(())
     }
@@ -61,7 +61,7 @@ impl IntComputer {
             Ok(op) => op,
             Err(e) => return Err(e),
         };
-        println!("{:4}           {:?}", self.pc, self.op);
+        print!("{:38}", format!("{:4}           {:?}", self.pc, self.op));
         let result = match self.op {
             Opcode::Add(params) => {
                 let input_iter = self.state.iter().skip(self.pc + 1).take(2);
@@ -74,7 +74,7 @@ impl IntComputer {
                 }
                 self.out = *self.state.get(self.pc + 3).unwrap() as usize;
                 println!(
-                    "    {:4} + {:4} = {:4} -> {:4}",
+                    "    {:5} + {:5} = {:5} -> {:4}",
                     self.in_reg[0],
                     self.in_reg[1],
                     self.in_reg[0] + self.in_reg[1],
@@ -94,7 +94,7 @@ impl IntComputer {
                 }
                 self.out = *self.state.get(self.pc + 3).unwrap() as usize;
                 println!(
-                    "    {:4} * {:4} = {:4} -> {:4}",
+                    "    {:5} + {:5} = {:5} -> {:4}",
                     self.in_reg[0],
                     self.in_reg[1],
                     self.in_reg[0] * self.in_reg[1],
@@ -121,9 +121,9 @@ impl IntComputer {
                     None => return Err(format!("Output index {} out of bounds", self.pc + 1)),
                 };
                 println!(
-                    "Value at {}: {}",
-                    self.pc + 1,
-                    IntComputer::load_param(&self.state, index as isize, Param::Immediate)?
+                    "\nOutput----->Value at {}: {}",
+                    index,
+                    IntComputer::load_param(&self.state, index as isize, Param::Pos)?
                 );
                 Ok(())
             } /* Output to the console */
@@ -171,16 +171,16 @@ impl TryFrom<&str> for IntComputer {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Param {
-    Positional,
-    Immediate,
+    Pos,
+    Imm,
     Invalid,
 }
 
 impl From<i32> for Param {
     fn from(val: i32) -> Self {
         match val {
-            0 => Param::Positional,
-            1 => Param::Immediate,
+            0 => Param::Pos,
+            1 => Param::Imm,
             _ => Param::Invalid,
         }
     }
@@ -188,8 +188,8 @@ impl From<i32> for Param {
 
 #[derive(Debug, Clone)]
 pub enum Opcode {
-    Add([Param; 3]),
-    Mult([Param; 3]),
+    Add([Param; 2]),
+    Mult([Param; 2]),
     Stop,
     Input,
     Output,
@@ -205,9 +205,9 @@ impl From<i32> for Opcode {
         let op = if x > 99 { x % 100 } else { x };
         let mut param = x / 100;
 
-        let mut array = [Param::Invalid; 3];
-        for i in 0..3 {
-            array[2 - i] = (param % 10).into();
+        let mut array = [Param::Invalid; 2];
+        for i in 0..2 {
+            array[i] = (param % 10).into();
             param /= 10;
         }
 
