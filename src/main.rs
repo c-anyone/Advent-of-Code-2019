@@ -2,6 +2,7 @@
 extern crate test;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::convert::TryFrom;
 
 mod int_code;
 use int_code::*;
@@ -14,6 +15,11 @@ fn main() {
         let line = line.unwrap();
         buf.push_str(&line);
     }
+
+    let mut int_computer: int_code::IntComputer = int_code::IntComputer::try_from(buf.as_str()).unwrap();
+
+    while int_computer.load_instruction_at_pc()
+
     // let mut buf = String::from("1,9,10,3,2,3,11,0,99,30,40,50");
     // let program_data = parse_program(&buf).unwrap();
 
