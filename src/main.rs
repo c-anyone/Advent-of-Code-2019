@@ -15,7 +15,7 @@ fn main() {
         buf.push_str(&line);
     }
     // let mut buf = String::from("1,9,10,3,2,3,11,0,99,30,40,50");
-    let program_data = parse_program(&buf);
+    let program_data = parse_program(&buf).unwrap();
 
     let mut ga = IntCodeProgram::new(&program_data);
     // println!{"The Result is {}", ga.run()};

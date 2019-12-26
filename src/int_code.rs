@@ -1,7 +1,8 @@
+use num::PrimInt;
 use std::convert::TryFrom;
 
-pub fn parse_program(input: &str) -> Vec<u8> {
-    input.split(',').map(|s| s.parse::<u8>().unwrap()).collect()
+pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
+    input.split(',').map(|s| s.parse()).collect()
 }
 
 #[derive(Debug, PartialEq)]
@@ -18,8 +19,8 @@ pub struct IntCode {
     out: usize,
 }
 
-impl From<&[u32]> for IntCode {
-    fn from(x: &[u32]) -> Self {
+impl From<&[i32]> for IntCode {
+    fn from(x: &[i32]) -> Self {
         IntCode {
             opcode: Opcode::from(x[0]),
             in1: x[1] as usize,
@@ -39,8 +40,8 @@ pub enum Opcode {
     Err,
 }
 
-impl From<u32> for Opcode {
-    fn from(x: u32) -> Self {
+impl From<i32> for Opcode {
+    fn from(x: i32) -> Self {
         let op = if x > 99 { x % 100 } else { x };
         let param = x - op;
         match op {
@@ -68,8 +69,8 @@ impl Opcode {
 }
 
 pub struct IntCodeProgram {
-    initial_state: Vec<u32>,
-    state: Vec<u32>,
+    initial_state: Vec<i32>,
+    state: Vec<i32>,
     pc: usize,
 }
 
@@ -107,12 +108,12 @@ impl IntCodeProgram {
         ret
     }
 
-    pub fn run(&mut self) -> u32 {
+    pub fn run(&mut self) -> i32 {
         while self.exec_step() != None {}
         self.state[0]
     }
 
-    pub fn run_with(&mut self, noun: u32, verb: u32) -> u32 {
+    pub fn run_with(&mut self, noun: i32, verb: i32) -> i32 {
         self.state[1] = noun;
         self.state[2] = verb;
         self.pc = 0;
@@ -136,15 +137,24 @@ impl IntCodeProgram {
         }
     }
 
-    pub fn new(data: &Vec<u8>) -> Self {
+    pub fn new(data: &Vec<i32>) -> Self {
         // let test = data.iter();
-        let state: Vec<u32> = data.iter().map(|x| *x as u32).collect();
+        // let state: Vec<i32> = data.iter().map(|x| (*x).from()).collect();
         IntCodeProgram {
-            initial_state: state.clone(),
-            state: state.to_owned(),
+            initial_state: data.clone(),
+            state: data.clone(),
             // instructions: IntCodeProgram::parse_instructions(data).unwrap(),
             pc: 0,
         }
+    }
+}
+
+impl TryFrom<&str> for IntCode {
+    type Error = &'static str;
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        let data = parse_program(text);
+
+        Err("Fuck")
     }
 }
 
@@ -155,7 +165,6 @@ mod int_code_computer {
         Immediate,
         Invalid,
     }
-
 
     #[derive(Debug)]
     pub enum Opcode {
@@ -199,12 +208,8 @@ mod int_code_computer {
                     in2: *x.next().unwrap(),
                     out: *x.next().unwrap(),
                 },
-                3 => {
-                    Opcode::Input(*x.next().unwrap())
-                },
-                4 => {
-                    Opcode::Output(*x.next().unwrap())
-                },
+                3 => Opcode::Input(*x.next().unwrap()),
+                4 => Opcode::Output(*x.next().unwrap()),
                 99 => Opcode::Stop,
                 _ => Opcode::Err,
             }
@@ -213,8 +218,16 @@ mod int_code_computer {
     impl Opcode {
         pub fn len(&self) -> usize {
             match self {
-                Opcode::Add{in1: _,in2: _,out: _} => 4,
-                Opcode::Mult{in1: _,in2: _,out: _} => 4,
+                Opcode::Add {
+                    in1: _,
+                    in2: _,
+                    out: _,
+                } => 4,
+                Opcode::Mult {
+                    in1: _,
+                    in2: _,
+                    out: _,
+                } => 4,
                 Opcode::Input(_) => 2,
                 Opcode::Output(_) => 2,
                 Opcode::Stop => 1,
@@ -224,8 +237,8 @@ mod int_code_computer {
     }
 
     struct IntComputer {
-        initial_state: Vec<u32>,
-        satate: Vec<u32>,
+        initial_state: Vec<i32>,
+        state: Vec<i32>,
         pc: usize,
         in1: isize,
         in2: isize,
@@ -235,9 +248,14 @@ mod int_code_computer {
 }
 
 mod tests {
+    use super::*;
 
     #[test]
     fn test_new() {
-        // let test_input = vec![1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50];
+        let correct = vec![1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50];
+        let input = String::from("1,9,10,3,2,3,11,0,99,30,40,50");
+        let result = parse_program(&input);
+        assert_eq!(true, result.is_ok());
+        assert_eq!(correct, result.unwrap());
     }
 }
