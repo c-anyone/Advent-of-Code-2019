@@ -1,6 +1,7 @@
 extern crate itertools;
 use itertools::multizip;
 use std::convert::TryFrom;
+use std::io;
 
 pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
     input.split(',').map(|s| s.parse()).collect()
@@ -10,7 +11,7 @@ impl IntComputer {
     // type Error = &'static str;
     pub fn new(data: &Vec<i32>) -> Self {
         IntComputer {
-            initial_state: data.clone(),
+            // initial_state: data.clone(),
             state: data.clone(),
             pc: 0,
             in_reg: [0, 0, 0],
@@ -46,11 +47,12 @@ impl IntComputer {
         }
     }
 
-    fn store_result(&mut self, value: i32, param: Param, location: usize) -> Result<(), String> {
-        if location > self.state.len() {
-            return Err(format!("Failed to store {}  @{}", value, location));
+    fn store_result(&mut self, value: i32) -> Result<(), String> {
+        if self.out > self.state.len() {
+            return Err(format!("Failed to store {}  @{}", value, self.out));
         }
-        self.state[location] = value;
+        println!("    Stored {} @ {}", value, self.out);
+        self.state[self.out] = value;
         Ok(())
     }
 
@@ -59,6 +61,7 @@ impl IntComputer {
             Ok(op) => op,
             Err(e) => return Err(e),
         };
+        println!("{:4}           {:?}", self.pc, self.op);
         let result = match self.op {
             Opcode::Add(params) => {
                 let input_iter = self.state.iter().skip(self.pc + 1).take(2);
@@ -70,11 +73,14 @@ impl IntComputer {
                     *reg = val;
                 }
                 self.out = *self.state.get(self.pc + 3).unwrap() as usize;
-                self.store_result(
+                println!(
+                    "    {:4} + {:4} = {:4} -> {:4}",
+                    self.in_reg[0],
+                    self.in_reg[1],
                     self.in_reg[0] + self.in_reg[1],
-                    params[2],
-                    self.out as usize,
-                )?;
+                    self.out
+                );
+                self.store_result(self.in_reg[0] + self.in_reg[1])?;
                 Ok(())
             }
             Opcode::Mult(params) => {
@@ -87,14 +93,28 @@ impl IntComputer {
                     *reg = val;
                 }
                 self.out = *self.state.get(self.pc + 3).unwrap() as usize;
-                self.store_result(
+                println!(
+                    "    {:4} * {:4} = {:4} -> {:4}",
+                    self.in_reg[0],
+                    self.in_reg[1],
                     self.in_reg[0] * self.in_reg[1],
-                    params[2],
-                    self.out as usize,
-                )?;
+                    self.out
+                );
+                self.store_result(self.in_reg[0] * self.in_reg[1])?;
                 Ok(())
             }
-            Opcode::Input => Ok(()), /* Prompt to input by calling an input function */
+            Opcode::Input => {
+                let mut buffer = String::new();
+                println!("Please Input an integer");
+                io::stdin().read_line(&mut buffer).unwrap();
+                let buffer = buffer.trim_end_matches("\r\n");
+                self.out = *self.state.get(self.pc + 1).unwrap() as usize;
+                match buffer.parse::<i32>() {
+                    Ok(x) => self.store_result(x).unwrap(),
+                    Err(_) => return Err(format!("Failed to parse Input {} as int", buffer)),
+                };
+                Ok(())
+            } /* Prompt to input by calling an input function */
             Opcode::Output => {
                 let index = match self.state.get(self.pc + 1) {
                     Some(&x) => x,
@@ -112,7 +132,7 @@ impl IntComputer {
                 println!("{}", msg);
                 Err(msg)
             } /* failed to parse instruction, crash execution */
-            Opcode::Stop => Ok(()),  /* done executing */
+            Opcode::Stop => Ok(()), /* done executing */
         };
 
         match result {
@@ -215,7 +235,7 @@ impl Opcode {
 }
 
 pub struct IntComputer {
-    initial_state: Vec<i32>,
+    // initial_state: Vec<i32>,
     state: Vec<i32>,
     pc: usize,
     in_reg: [i32; 3],
