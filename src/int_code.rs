@@ -137,6 +137,7 @@
 // }
 
 mod int_code_computer {
+    use itertools::multizip;
     use std::convert::TryFrom;
 
     pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
@@ -150,18 +151,16 @@ mod int_code_computer {
                 initial_state: data.clone(),
                 state: data.clone(),
                 pc: 0,
-                in1: 0,
-                in2: 0,
-                out: 0,
+                register: [0, 0, 0],
                 op: Opcode::Err,
             }
         }
 
-        fn load_instruction_at_pc(&mut self) -> Result<(Opcode), String> {
+        fn load_instruction_at_pc(&mut self) -> Result<Opcode, String> {
             match self.state.get(self.pc) {
                 Some(inst) => {
                     let inst = *inst;
-                    Ok((inst.into()))
+                    Ok(inst.into())
                 }
                 None => {
                     return Err(format!(
@@ -184,17 +183,20 @@ mod int_code_computer {
             }
         }
 
-        fn store_result(&mut self, value: i32, location: isize) -> Result<(), String> {
-            match self.state.iter_mut().skip(location as usize).next() {
-                Some(x) => {
-                    *x = value;
-                    Ok(())
-                }
-                None => Err(format!(
+        fn store_result(
+            &mut self,
+            value: i32,
+            param: Param,
+            location: usize,
+        ) -> Result<(), String> {
+            if location > self.state.len() {
+                return Err(format!(
                     "Failed to store value@location: {}@{}",
                     value, location
-                )),
+                ));
             }
+            self.state[location] = value;
+            Ok(())
         }
 
         fn execute_loaded_instruction(&mut self) -> Result<Opcode, String> {
@@ -203,19 +205,48 @@ mod int_code_computer {
                 Err(e) => return Err(e),
             };
             let result = match self.op {
-                Opcode::Add(in1, in2, _out) => {
-                    let mut iter = self.state.iter().skip(self.pc).take(3);
-                    self.in1 = self.load_param(*(iter.next().unwrap()) as isize, in1)?;
-                    self.in2 = self.load_param(*(iter.next().unwrap()) as isize, in2)?;
-                    self.out = self.in1 + self.in2;
-                    let out_location = self.load_param(*(iter.next().unwrap() as isize, _out));
-                    self.store_param(self.out, *(iter.next().unwrap()) as isize)?;
+                Opcode::Add(params) => {
+                    let input_iter = self.state.iter().skip(self.pc).take(3);
+                    let reg_iter = self.register.iter_mut();
+                    let iter = multizip((input_iter, reg_iter, params.iter()));
+
+                    for (&inp, reg, &param) in iter {
+                        // *reg = self.load_param(inp as isize, param)?;
+                        *reg = match param {
+                            Param::Positional => *(self.state.get(inp as usize).unwrap()),
+                            Param::Immediate => inp,
+                            Param::Invalid => {
+                                return Err(format!("Invalid Parameter at {}", self.pc))
+                            }
+                        };
+                    }
+                    self.store_result(
+                        self.register[0] + self.register[1],
+                        params[2],
+                        self.register[2] as usize,
+                    )?;
                     Ok(())
                 }
-                Opcode::Mult(in1, in2, _out) => {
-                    let mut iter = self.state.iter().skip(self.pc).take(3);
-                    self.in1 = self.load_param(*(iter.next().unwrap()) as isize, in1)?;
-                    self.in2 = self.load_param(*(iter.next().unwrap()) as isize, in2)?;
+                Opcode::Mult(params) => {
+                    let input_iter = self.state.iter().skip(self.pc).take(3);
+                    let reg_iter = self.register.iter_mut();
+                    let iter = multizip((input_iter, reg_iter, params.iter()));
+
+                    for (&inp, reg, &param) in iter {
+                        // *reg = self.load_param(inp as isize, param)?;
+                        *reg = match param {
+                            Param::Positional => *(self.state.get(inp as usize).unwrap()),
+                            Param::Immediate => inp,
+                            Param::Invalid => {
+                                return Err(format!("Invalid Parameter at {}", self.pc))
+                            }
+                        };
+                    }
+                    self.store_result(
+                        self.register[0] * self.register[1],
+                        params[2],
+                        self.register[2] as usize,
+                    )?;
                     Ok(())
                 }
                 Opcode::Input => Ok(()), /* Prompt to input by calling an input function */
@@ -240,7 +271,10 @@ mod int_code_computer {
             };
 
             match result {
-                Ok(()) => Ok(self.op.clone()),
+                Ok(()) => {
+                    self.pc += self.op.len();
+                    Ok(self.op.clone())
+                }
                 Err(x) => Err(x),
             }
             // Err(format!("Fuck"))
@@ -322,19 +356,18 @@ mod int_code_computer {
             }
 
             result.reverse();
-            let mut x = result.iter();
 
             match op {
-                1 => Opcode::Add(
-                    /* in1: */ *x.next().unwrap(),
-                    /* in2: */ *x.next().unwrap(),
-                    /* out: */ *x.next().unwrap(),
-                ),
-                2 => Opcode::Mult(
-                    /* in1: */ *x.next().unwrap(),
-                    /* in2: */ *x.next().unwrap(),
-                    /* out: */ *x.next().unwrap(),
-                ),
+                1 => {
+                    let mut array = [Param::Invalid; 3];
+                    array.copy_from_slice(&result);
+                    Opcode::Add(array)
+                }
+                2 => {
+                    let mut array = [Param::Invalid; 3];
+                    array.copy_from_slice(&result);
+                    Opcode::Mult(array)
+                }
                 3 => Opcode::Input,
                 4 => Opcode::Output,
                 99 => Opcode::Stop,
@@ -345,8 +378,8 @@ mod int_code_computer {
     impl Opcode {
         pub fn len(&self) -> usize {
             match self {
-                Opcode::Add(_, _, _) => 4,
-                Opcode::Mult(_, _, _) => 4,
+                Opcode::Add(_) => 4,
+                Opcode::Mult(_) => 4,
                 Opcode::Input => 2,
                 Opcode::Output => 2,
                 Opcode::Stop => 1,
@@ -359,9 +392,7 @@ mod int_code_computer {
         initial_state: Vec<i32>,
         state: Vec<i32>,
         pc: usize,
-        in1: i32,
-        in2: i32,
-        out: i32,
+        register: [i32; 3],
         op: Opcode,
     }
 }
