@@ -1,11 +1,44 @@
 extern crate itertools;
 use itertools::multizip;
 use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::io;
 
 pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
     input.split(',').map(|s| s.parse()).collect()
 }
+
+
+#[derive(Debug, Clone)]
+pub enum Opcode {
+    Add([Param; 2]),
+    Mult([Param; 2]),
+    Stop,
+    Input,
+    Output,
+    JumpTrue([Param; 2]),
+    JumpFalse([Param; 2]),
+    LessThan([Param; 2]),
+    Equals([Param; 2]),
+    Err,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Param {
+    Pos,
+    Imm,
+    Invalid,
+}
+
+pub struct IntComputer {
+    // initial_state: Vec<i32>,
+    state: Vec<i32>,
+    pc: usize,
+    in_reg: [i32; 3],
+    out: usize,
+    op: Opcode,
+}
+
 
 impl IntComputer {
     // type Error = &'static str;
@@ -56,14 +89,12 @@ impl IntComputer {
         Ok(())
     }
 
-    fn execute_instruction(&mut self) -> Result<Opcode, String> {
-        self.op = match self.load_instruction_at_pc() {
-            Ok(op) => op,
-            Err(e) => return Err(e),
-        };
-        print!("{:38}", format!("{:4}           {:?}", self.pc, self.op));
-        let result = match self.op {
-            Opcode::Add(params) => {
+    fn setup_regs_for_current(&mut self) -> Result<(), String> {
+        match self.op {
+            Opcode::Add(params)
+            | Opcode::Mult(params)
+            | Opcode::LessThan(params)
+            | Opcode::Equals(params) => {
                 let input_iter = self.state.iter().skip(self.pc + 1).take(2);
                 let reg_iter = self.in_reg.iter_mut().take(2);
                 let iter = multizip((input_iter, reg_iter, params.iter().take(2)));
@@ -73,6 +104,36 @@ impl IntComputer {
                     *reg = val;
                 }
                 self.out = *self.state.get(self.pc + 3).unwrap() as usize;
+                Ok(())
+            }
+            Opcode::Input => {
+                self.out = *self.state.get(self.pc + 1).unwrap() as usize;
+                Ok(())
+            },
+            Opcode::Output => {
+                self.in_reg[0] = *self.state.get(self.pc + 1).unwrap();
+                Ok(())
+            },
+            Opcode::JumpTrue(params) | Opcode::JumpFalse(params) => {
+                self.in_reg[0] = *self.state.get(self.pc + 1).unwrap();
+                self.out = *self.state.get(self.pc + 2).unwrap() as usize;
+                Ok(())
+            },
+            _ => Ok(()),
+        }
+    }
+
+    fn execute_instruction(&mut self) -> Result<Opcode, String> {
+        self.op = match self.load_instruction_at_pc() {
+            Ok(op) => op,
+            Err(e) => return Err(e),
+        };
+        print!("{:38}", format!("{:4}           {:?}", self.pc, self.op));
+        self.setup_regs_for_current();
+
+        let result = match self.op {
+            _ => Ok(()),
+            Opcode::Add(params) => {
                 println!(
                     "    {:5} + {:5} = {:5} -> {:4}",
                     self.in_reg[0],
@@ -84,15 +145,6 @@ impl IntComputer {
                 Ok(())
             }
             Opcode::Mult(params) => {
-                let input_iter = self.state.iter().skip(self.pc + 1).take(2);
-                let reg_iter = self.in_reg.iter_mut().take(2);
-                let iter = multizip((input_iter, reg_iter, params.iter().take(2)));
-
-                for (&inp, reg, &param) in iter {
-                    let val = IntComputer::load_param(&self.state, inp as isize, param)?;
-                    *reg = val;
-                }
-                self.out = *self.state.get(self.pc + 3).unwrap() as usize;
                 println!(
                     "    {:5} + {:5} = {:5} -> {:4}",
                     self.in_reg[0],
@@ -108,7 +160,6 @@ impl IntComputer {
                 println!("Please Input an integer");
                 io::stdin().read_line(&mut buffer).unwrap();
                 let buffer = buffer.trim_end_matches("\r\n");
-                self.out = *self.state.get(self.pc + 1).unwrap() as usize;
                 match buffer.parse::<i32>() {
                     Ok(x) => self.store_result(x).unwrap(),
                     Err(_) => return Err(format!("Failed to parse Input {} as int", buffer)),
@@ -116,6 +167,7 @@ impl IntComputer {
                 Ok(())
             } /* Prompt to input by calling an input function */
             Opcode::Output => {
+                /* Output to the console */
                 let index = match self.state.get(self.pc + 1) {
                     Some(&x) => x,
                     None => return Err(format!("Output index {} out of bounds", self.pc + 1)),
@@ -126,7 +178,8 @@ impl IntComputer {
                     IntComputer::load_param(&self.state, index as isize, Param::Pos)?
                 );
                 Ok(())
-            } /* Output to the console */
+            }
+            Opcode::JumpTrue(params) => Ok(()),
             Opcode::Err => {
                 let msg = format!("Invalid instruction @ {}", self.pc);
                 println!("{}", msg);
@@ -169,12 +222,7 @@ impl TryFrom<&str> for IntComputer {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Param {
-    Pos,
-    Imm,
-    Invalid,
-}
+
 
 impl From<i32> for Param {
     fn from(val: i32) -> Self {
@@ -186,36 +234,30 @@ impl From<i32> for Param {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Opcode {
-    Add([Param; 2]),
-    Mult([Param; 2]),
-    Stop,
-    Input,
-    Output,
-    Err,
-}
-
-trait ParseParam {
-    fn parse_params(input: u32);
-}
 
 impl From<i32> for Opcode {
     fn from(x: i32) -> Self {
         let op = if x > 99 { x % 100 } else { x };
         let mut param = x / 100;
 
-        let mut array = [Param::Invalid; 2];
-        for i in 0..2 {
+        let mut array = [Param::Pos; 3];
+        for i in 0..3 {
+            if param == 0 {
+                break;
+            }
             array[i] = (param % 10).into();
             param /= 10;
         }
 
         match op {
-            1 => Opcode::Add(array),
-            2 => Opcode::Mult(array),
+            1 => Opcode::Add(array[0..2].try_into().unwrap()),
+            2 => Opcode::Mult(array[0..2].try_into().unwrap()),
             3 => Opcode::Input,
             4 => Opcode::Output,
+            5 => Opcode::JumpTrue(array[0..2].try_into().unwrap()),
+            6 => Opcode::JumpFalse(array[0..2].try_into().unwrap()),
+            7 => Opcode::LessThan(array[0..2].try_into().unwrap()),
+            8 => Opcode::Equals(array[0..2].try_into().unwrap()),
             99 => Opcode::Stop,
             _ => Opcode::Err,
         }
@@ -228,19 +270,14 @@ impl Opcode {
             Opcode::Mult(_) => 4,
             Opcode::Input => 2,
             Opcode::Output => 2,
+            Opcode::JumpTrue(_) => 3,
+            Opcode::JumpFalse(_) => 3,
+            Opcode::LessThan(_) => 4,
+            Opcode::Equals(_) => 4,
             Opcode::Stop => 1,
             Opcode::Err => 0,
         }
     }
-}
-
-pub struct IntComputer {
-    // initial_state: Vec<i32>,
-    state: Vec<i32>,
-    pc: usize,
-    in_reg: [i32; 3],
-    out: usize,
-    op: Opcode,
 }
 
 mod tests {

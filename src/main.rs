@@ -4,8 +4,8 @@ use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-mod int_code;
-use int_code::*;
+mod int_code_v2;
+use int_code_v2::*;
 
 fn main() {
     let reader = BufReader::new(File::open("input_day5_part1.txt").expect("File not found!"));
@@ -17,8 +17,9 @@ fn main() {
     }
     // let mut buf = String::from("1,9,10,3,2,3,11,0,99,30,40,50");
 
-    let mut int_computer: int_code::IntComputer =
+    let mut int_computer: IntComputer =
         IntComputer::try_from(buf.as_str()).unwrap();
+    int_computer.push_input(1);
 
     loop {
         let x = int_computer.step();
