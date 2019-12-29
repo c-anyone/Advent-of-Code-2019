@@ -19,7 +19,7 @@ fn main() {
 
     let mut int_computer: IntComputer =
         IntComputer::try_from(buf.as_str()).unwrap();
-    int_computer.push_input(1);
+    int_computer.push_input(5);
 
     loop {
         let x = int_computer.step();
@@ -30,6 +30,8 @@ fn main() {
         };
         break;
     }
+
+    
 
     // println!("Execution resulted in {}", int_computer.get(0).unwrap());
     // let program_data = parse_program(&buf).unwrap();

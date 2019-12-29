@@ -116,6 +116,8 @@ impl IntComputer {
                 let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
 
                 self.try_store_at(i1 + i2, out as usize)?;
+                self.pc += inst.op.len();
+
                 Ok(true)
             }
             Opcode::Mult => {
@@ -124,6 +126,8 @@ impl IntComputer {
                 let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
 
                 self.try_store_at(i1 * i2, out as usize)?;
+                self.pc += inst.op.len();
+                
                 Ok(true)
             }
             Opcode::Input => {
@@ -134,41 +138,94 @@ impl IntComputer {
                     let p = inst.params[0];
                     let &loc = self.try_get_param_ref(Param::Imm, self.pc + 1).unwrap();
                     self.try_store_at(val, loc as usize)?;
+                    self.pc += inst.op.len();                    
                     Ok(true)
                 }
             }
             Opcode::Output => {
                 let &out = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
                 println!("Output: {}", out);
+                self.pc += inst.op.len();                
                 Ok(true)
             }
             Opcode::Stop => Ok(false),
-            // Opcode::JumpTrue => Some(()),
-            // Opcode::JumpFalse => Some(()),
-            // Opcode::LessThan => Some(()),
-            // Opcode::Equals => Some(()),
+            Opcode::JumpTrue => {
+                let &input = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
+                if input != 0 {
+                    let &new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
+                    if new_pc as usize > self.mem.len() {
+                        return Err(format!(
+                            "New PC {} @ {} not valid, len {}",
+                            new_pc,
+                            self.pc,
+                            self.mem.len()
+                        ));
+                    }
+                    self.pc = new_pc as usize;
+                } else {
+                    self.pc += inst.op.len();
+                }
+                Ok(true)
+            }
+            Opcode::JumpFalse => {
+                let &input = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
+                if input == 0 {
+                    let &new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
+                    if new_pc as usize > self.mem.len() {
+                        return Err(format!(
+                            "New PC {} @ {} not valid, len {}",
+                            new_pc,
+                            self.pc,
+                            self.mem.len()
+                        ));
+                    }
+                    self.pc = new_pc as usize;
+                } else {
+                    self.pc += inst.op.len();
+                }
+                Ok(true)
+            }
+            Opcode::LessThan => {
+                let &i1 = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
+                let &i2 = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
+                let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
+
+                let res = if i1 < i2 {1} else {0};
+                
+                self.try_store_at(res, out as usize)?;
+                self.pc += inst.op.len();
+                Ok(true)
+            },
+            Opcode::Equals => {
+                let &i1 = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
+                let &i2 = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
+                let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
+
+                let res = if i1 == i2 {1} else {0};
+                
+                self.try_store_at(res, out as usize)?;
+                self.pc += inst.op.len();
+                Ok(true)
+            },
             Opcode::Err => Err(format!(
                 "Invalid Opcode {} @ {}",
                 self.mem[self.pc], self.pc
             )),
-            _ => return Err(format!("Not Implemented")),
-        };
-
-        match result {
-            Err(x) => Err(format!("Execution halted @ {}\nMessage {}", self.pc, x)),
-            Ok(x) => {
-                self.pc += inst.op.len();
-                Ok(x)
+            _ => {
+                return Err(format!(
+                    "Not Implemented Instruction {} @ {}",
+                    self.mem[self.pc], self.pc
+                ))
             }
-        }
+        };
+        result
     }
 
     fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&i32, String> {
         if index > self.mem.len() {
             return Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
-                self.pc,
-                index,
+                self.pc, index,
             ));
         }
         match p {
@@ -199,6 +256,13 @@ impl IntComputer {
     }
 
     fn get_instruction(&self) -> Result<Instruction, String> {
+        if self.pc > self.mem.len() {
+            return Err(format!(
+                "PC out of bounds: {:04} length {}",
+                self.pc,
+                self.mem.len()
+            ));
+        }
         let &x = self.mem.get(self.pc).unwrap();
         let op = if x > 99 { x % 100 } else { x };
         let mut params = x / 100;
