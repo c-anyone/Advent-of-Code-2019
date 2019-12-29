@@ -7,6 +7,9 @@ use std::io::{BufRead, BufReader};
 mod int_code;
 use int_code::*;
 
+mod day_6;
+// use day_6;
+
 fn day_5_run() {
     let reader = BufReader::new(File::open("input_day5_part1.txt").expect("File not found!"));
     let mut buf = String::new();
@@ -30,8 +33,12 @@ fn day_5_run() {
     }
 }
 
+fn day_6_run() {
+    day_6::run();
+}
+
 fn main() {
 
     day_5_run();
-
+    day_6_run();
 }
