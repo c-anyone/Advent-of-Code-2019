@@ -45,3 +45,23 @@ Here are some example programs:
 
 Try every combination of phase settings on the amplifiers. What is the highest signal that can be sent to the thrusters?
 */
+use std::fs::File;
+use std::io::{Read, BufReader};
+use std::convert::TryFrom;
+
+use crate::int_code::IntComputer;
+// use int_code::IntComputer;
+
+pub fn day_7_run() {
+    let mut reader = BufReader::new(File::open("input_day7_part1.txt").expect("File not found"));
+    let mut program = String::new();
+
+    reader.read_to_string(&mut program).unwrap();
+    
+    let input_options = 
+
+    let mut int_computer: IntComputer = IntComputer::try_from(program.as_str()).unwrap();
+    int_computer.push_input(3); // first input is amplifier phase setting
+    int_computer.push_input(0); // second input
+
+}

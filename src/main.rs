@@ -9,6 +9,7 @@ use int_code::*;
 
 mod day_6;
 // use day_6;
+mod day_7;
 
 fn day_5_run() {
     let reader = BufReader::new(File::open("input_day5_part1.txt").expect("File not found!"));
@@ -42,4 +43,6 @@ fn main() {
     day_5_run();
     println!("------------ Day 6 ------------");
     day_6_run();
+    println!("------------ Day 7 ------------");
+    day_7::day_7_run();
 }
