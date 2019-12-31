@@ -38,7 +38,8 @@ fn day_6_run() {
 }
 
 fn main() {
-
+    println!("------------ Day 5 ------------");
     day_5_run();
+    println!("------------ Day 6 ------------");
     day_6_run();
 }
