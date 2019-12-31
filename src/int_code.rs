@@ -5,8 +5,6 @@ pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
     input.split(',').map(|s| s.parse()).collect()
 }
 
-type IntField = i32;
-
 #[derive(Debug, Clone)]
 pub enum Opcode {
     Add,
