@@ -44,16 +44,55 @@ Here are some example programs:
     1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0
 
 Try every combination of phase settings on the amplifiers. What is the highest signal that can be sent to the thrusters?
+
+--- Part Two ---
+
+It's no good - in this configuration, the amplifiers can't generate a large enough output signal to produce the thrust you'll need. The Elves quickly talk you through rewiring the amplifiers into a feedback loop:
+
+      O-------O  O-------O  O-------O  O-------O  O-------O
+0 -+->| Amp A |->| Amp B |->| Amp C |->| Amp D |->| Amp E |-.
+   |  O-------O  O-------O  O-------O  O-------O  O-------O |
+   |                                                        |
+   '--------------------------------------------------------+
+                                                            |
+                                                            v
+                                                     (to thrusters)
+
+Most of the amplifiers are connected as they were before; amplifier A's output is connected to amplifier B's input, and so on. However, the output from amplifier E is now connected into amplifier A's input. This creates the feedback loop: the signal will be sent through the amplifiers many times.
+
+In feedback loop mode, the amplifiers need totally different phase settings: integers from 5 to 9, again each used exactly once. These settings will cause the Amplifier Controller Software to repeatedly take input and produce output many times before halting. Provide each amplifier its phase setting at its first input instruction; all further input/output instructions are for signals.
+
+Don't restart the Amplifier Controller Software on any amplifier during this process. Each one should continue receiving and sending signals until it halts.
+
+All signals sent or received in this process will be between pairs of amplifiers except the very first signal and the very last signal. To start the process, a 0 signal is sent to amplifier A's input exactly once.
+
+Eventually, the software on the amplifiers will halt after they have processed the final loop. When this happens, the last output signal from amplifier E is sent to the thrusters. Your job is to find the largest output signal that can be sent to the thrusters using the new phase settings and feedback loop arrangement.
+
+Here are some example programs:
+
+    Max thruster signal 139629729 (from phase setting sequence 9,8,7,6,5):
+
+    3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,
+    27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5
+
+    Max thruster signal 18216 (from phase setting sequence 9,7,8,5,6):
+
+    3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,
+    -5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,
+    53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10
+
+Try every combination of the new phase settings on the amplifier feedback loop. What is the highest signal that can be sent to the thrusters?
+
 */
 use itertools::Itertools;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use crate::int_code::IntComputer;
+use crate::int_code::{IntComputer, IntComputerState};
 // use int_code::IntComputer;
 
-pub fn day_7_run() {
+pub fn day_7_run_part_1() {
     let mut reader = BufReader::new(File::open("input_day7_part1.txt").expect("File not found"));
     let mut program = String::new();
 
@@ -61,19 +100,58 @@ pub fn day_7_run() {
     let phase_settings = (0..=4).permutations(5);
     // let iter = phase_settings.as_slice().iter().permutations();
     let mut results = Vec::new();
-    
     for perm in phase_settings {
-        let mut x = 0;
+        let mut signal = 0;
         for setting in perm {
             let mut int_computer: IntComputer = IntComputer::try_from(program.as_str()).unwrap();
             int_computer.push_input(setting);
-            int_computer.push_input(x);
+            int_computer.push_input(signal);
             int_computer.run().unwrap();
-            x = int_computer.get_output().unwrap();
+            signal = int_computer.get_output().unwrap();
         }
-        results.push(x);
+        results.push(signal);
     }
-    println!("Found {} results", results.len());
-    println!("Maximum is {}", results.iter().max().unwrap());
+    println!("Part1: Found {} results", results.len());
+    println!("Part1: Maximum is {}", results.iter().max().unwrap());
 }
 
+pub fn day_7_run_part_2() {
+    let mut reader = BufReader::new(File::open("input_day7_part1.txt").expect("File not found"));
+    let mut program = String::new();
+
+    reader.read_to_string(&mut program).unwrap();
+    let phase_settings = (5..=9).permutations(5);
+    let int_computer: IntComputer = IntComputer::try_from(program.as_str()).unwrap();
+    
+    let mut amps: Vec<IntComputer> = Vec::new();
+    
+    let mut best = 0;
+    for input in phase_settings {
+        // create a list of computers, each with it's own state / separate copy
+        // and set the first input, phase setting
+        for x in input {
+            let mut a = int_computer.clone();
+            a.push_input(x);
+            amps.push(a);
+        }
+
+        let mut signal = 0;
+        loop {
+            for amp in amps.iter_mut() {
+                amp.push_input(signal);
+                amp.run();
+                signal = amp.get_output().unwrap();
+            }
+            match amps.last().unwrap().get_state() {
+                IntComputerState::Stopped => {
+                    break;
+                },
+                _ => ()
+            }
+        }
+        best = best.max(signal);
+    }
+    println!("Best Setting is {}", best);
+      // println!("Part2: Found {} results", results.len());
+      // println!("Part2: Maximum is {}", results.iter().max().unwrap());
+}

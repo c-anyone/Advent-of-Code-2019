@@ -57,7 +57,6 @@ What is the total number of direct and indirect orbits in your map data?
 */
 
 use itertools::Itertools;
-use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

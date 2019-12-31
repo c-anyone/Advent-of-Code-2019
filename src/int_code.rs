@@ -1,6 +1,5 @@
-use itertools;
-use std::convert::TryFrom;
 use std::collections::VecDeque;
+use std::convert::TryFrom;
 
 pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
     input.split(',').map(|s| s.parse()).collect()
@@ -52,14 +51,6 @@ impl Opcode {
     }
 }
 
-// impl From<&[i32]> for Opcode<'_> {
-//     fn from(inst: &[i32]) -> Self {
-//         // get the opcode and take out
-//         let x = *inst.first().unwrap();
-
-//     }
-// }
-
 impl TryFrom<&str> for IntComputer {
     type Error = &'static str;
     fn try_from(text: &str) -> Result<Self, Self::Error> {
@@ -81,11 +72,23 @@ impl TryFrom<i32> for Param {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct IntComputer {
     mem: Memory,
     pc: usize,
+    state: IntComputerState,
     input: VecDeque<i32>,
     output: VecDeque<i32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum IntComputerState {
+    // Created,
+    Initialized,
+    Running,
+    Halted,
+    Stopped,
+    Err,
 }
 
 struct Instruction {
@@ -98,6 +101,7 @@ impl IntComputer {
         IntComputer {
             mem: prog.to_owned(),
             pc: 0,
+            state: IntComputerState::Initialized,
             input: VecDeque::new(),
             output: VecDeque::new(),
         }
@@ -106,31 +110,43 @@ impl IntComputer {
     pub fn get_output(&mut self) -> Option<i32> {
         match self.output.front() {
             Some(x) => Some(*x),
-            None => None
+            None => None,
         }
+    }
+
+    pub fn get_state(&self) -> IntComputerState {
+        self.state
     }
 
     pub fn push_input(&mut self, value: i32) {
         self.input.push_back(value);
     }
 
-    pub fn run(&mut self) -> Result<(), String> {
+    pub fn run(&mut self) -> Result<IntComputerState, String> {
         loop {
-            let x = self.step();
-            return match x {
-                Ok(true) => continue,
-                Ok(false) => Ok(()),
-                Err(x) => Err(format!("Execution halted with an Error {}", x)),
+            // let x = self.step();
+            self.step()?;
+            use IntComputerState::*;
+            match self.state {
+                Initialized => (),
+                Running => (),
+                Halted | Stopped => break,
+                // Created => (),
+                Err => (),
             };
-            // break; 
-            // result
+            // return match x {
+            //     Ok(Opcode::Input) => Ok(IntComputerState::Halted),
+            //     Ok(Opcode::Output) => Ok(Some(self.get_output().unwrap())),
+            //     Ok(_x) => continue,
+            //     Err(x)=> Err(format!("Execution halted with an Error {}", x)),
+            // };
         }
-        // result
+        Ok(self.state)
     }
 
-    pub fn step(&mut self) -> Result<bool, String> {
+    pub fn step(&mut self) -> Result<Opcode, String> {
         let inst = self.get_instruction()?;
-
+        self.state = IntComputerState::Running;
         let result = match inst.op {
             Opcode::Add => {
                 let &i1 = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
@@ -153,7 +169,9 @@ impl IntComputer {
             }
             Opcode::Input => {
                 if self.input.is_empty() {
-                    Err(format!("No Input supplied"))
+                    // Err(format!("No Input supplied"))
+                    self.state = IntComputerState::Halted;
+                    Ok(false)
                 } else {
                     let val = self.input.pop_front().unwrap();
                     let &loc = self.try_get_param_ref(Param::Imm, self.pc + 1).unwrap();
@@ -165,11 +183,14 @@ impl IntComputer {
             Opcode::Output => {
                 let &out = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
                 self.output.push_back(out);
-                println!("Output: {}", out);
+                // println!("Output: {}", out);
                 self.pc += inst.op.len();
                 Ok(true)
             }
-            Opcode::Stop => Ok(false),
+            Opcode::Stop => {
+                self.state = IntComputerState::Stopped;
+                Ok(false)
+            }
             Opcode::JumpTrue => {
                 let &input = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
                 if input != 0 {
@@ -237,7 +258,7 @@ impl IntComputer {
                 ))
             }
         };
-        result
+        Ok(inst.op)
     }
 
     fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&i32, String> {
