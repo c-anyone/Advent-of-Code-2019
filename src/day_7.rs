@@ -45,9 +45,10 @@ Here are some example programs:
 
 Try every combination of phase settings on the amplifiers. What is the highest signal that can be sent to the thrusters?
 */
-use std::fs::File;
-use std::io::{Read, BufReader};
+use itertools::Itertools;
 use std::convert::TryFrom;
+use std::fs::File;
+use std::io::{BufReader, Read};
 
 use crate::int_code::IntComputer;
 // use int_code::IntComputer;
@@ -57,11 +58,22 @@ pub fn day_7_run() {
     let mut program = String::new();
 
     reader.read_to_string(&mut program).unwrap();
+    let phase_settings = (0..=4).permutations(5);
+    // let iter = phase_settings.as_slice().iter().permutations();
+    let mut results = Vec::new();
     
-    let input_options = 
-
-    let mut int_computer: IntComputer = IntComputer::try_from(program.as_str()).unwrap();
-    int_computer.push_input(3); // first input is amplifier phase setting
-    int_computer.push_input(0); // second input
-
+    for perm in phase_settings {
+        let mut x = 0;
+        for setting in perm {
+            let mut int_computer: IntComputer = IntComputer::try_from(program.as_str()).unwrap();
+            int_computer.push_input(setting);
+            int_computer.push_input(x);
+            int_computer.run().unwrap();
+            x = int_computer.get_output().unwrap();
+        }
+        results.push(x);
+    }
+    println!("Found {} results", results.len());
+    println!("Maximum is {}", results.iter().max().unwrap());
 }
+

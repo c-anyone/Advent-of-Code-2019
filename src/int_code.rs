@@ -1,5 +1,6 @@
 use itertools;
 use std::convert::TryFrom;
+use std::collections::VecDeque;
 
 pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
     input.split(',').map(|s| s.parse()).collect()
@@ -83,7 +84,8 @@ impl TryFrom<i32> for Param {
 pub struct IntComputer {
     mem: Memory,
     pc: usize,
-    input: Vec<i32>,
+    input: VecDeque<i32>,
+    output: VecDeque<i32>,
 }
 
 struct Instruction {
@@ -96,12 +98,20 @@ impl IntComputer {
         IntComputer {
             mem: prog.to_owned(),
             pc: 0,
-            input: Vec::new(),
+            input: VecDeque::new(),
+            output: VecDeque::new(),
+        }
+    }
+
+    pub fn get_output(&mut self) -> Option<i32> {
+        match self.output.front() {
+            Some(x) => Some(*x),
+            None => None
         }
     }
 
     pub fn push_input(&mut self, value: i32) {
-        self.input.push(value);
+        self.input.push_back(value);
     }
 
     pub fn run(&mut self) -> Result<(), String> {
@@ -145,8 +155,7 @@ impl IntComputer {
                 if self.input.is_empty() {
                     Err(format!("No Input supplied"))
                 } else {
-                    let val = self.input.pop().unwrap();
-                    let p = inst.params[0];
+                    let val = self.input.pop_front().unwrap();
                     let &loc = self.try_get_param_ref(Param::Imm, self.pc + 1).unwrap();
                     self.try_store_at(val, loc as usize)?;
                     self.pc += inst.op.len();
@@ -155,6 +164,7 @@ impl IntComputer {
             }
             Opcode::Output => {
                 let &out = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
+                self.output.push_back(out);
                 println!("Output: {}", out);
                 self.pc += inst.op.len();
                 Ok(true)
