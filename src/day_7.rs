@@ -134,28 +134,21 @@ pub fn day_7_run_part_2() {
         }
 
         let mut signal = 0;
-        loop {
-            for amp in amps.iter_mut() {
-                amp.push_input(signal);
-                amp.run().unwrap();
-                signal = amp.get_output().unwrap();
-            }
 
+        loop {
             if amps
-                .iter()
+                .iter_mut()
+                .map(|amp| {
+                    amp.push_input(signal);
+                    amp.run().unwrap();
+                    signal = amp.get_output().unwrap();
+                    amp
+                })
                 .all(|x| x.get_state() == IntComputerState::Stopped)
             {
                 println!("Input: {:?} Signal strength {}", input, signal);
                 break;
             }
-
-            // match amps.last().unwrap().get_state() {
-            //     IntComputerState::Stopped => {
-            //         println!("Input: {:?} Signal strength {}", input, signal);
-            //         break;
-            //     },
-            //     _ => ()
-            // }
         }
         if signal > best {
             println!("New Best found! {} > {}", signal, best);
