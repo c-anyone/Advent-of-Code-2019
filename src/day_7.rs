@@ -122,14 +122,12 @@ pub fn day_7_run_part_2() {
     reader.read_to_string(&mut program).unwrap();
     let phase_settings = (5..=9).permutations(5);
     let int_computer: IntComputer = IntComputer::try_from(program.as_str()).unwrap();
-    
-    let mut amps: Vec<IntComputer> = Vec::new();
-    
     let mut best = 0;
     for input in phase_settings {
+        let mut amps: Vec<IntComputer> = Vec::new();
         // create a list of computers, each with it's own state / separate copy
         // and set the first input, phase setting
-        for x in input {
+        for &x in input.iter() {
             let mut a = int_computer.clone();
             a.push_input(x);
             amps.push(a);
@@ -139,19 +137,32 @@ pub fn day_7_run_part_2() {
         loop {
             for amp in amps.iter_mut() {
                 amp.push_input(signal);
-                amp.run();
+                amp.run().unwrap();
                 signal = amp.get_output().unwrap();
             }
-            match amps.last().unwrap().get_state() {
-                IntComputerState::Stopped => {
-                    break;
-                },
-                _ => ()
+
+            if amps
+                .iter()
+                .all(|x| x.get_state() == IntComputerState::Stopped)
+            {
+                println!("Input: {:?} Signal strength {}", input, signal);
+                break;
             }
+
+            // match amps.last().unwrap().get_state() {
+            //     IntComputerState::Stopped => {
+            //         println!("Input: {:?} Signal strength {}", input, signal);
+            //         break;
+            //     },
+            //     _ => ()
+            // }
         }
-        best = best.max(signal);
+        if signal > best {
+            println!("New Best found! {} > {}", signal, best);
+            best = signal;
+        }
     }
     println!("Best Setting is {}", best);
-      // println!("Part2: Found {} results", results.len());
-      // println!("Part2: Maximum is {}", results.iter().max().unwrap());
+    // println!("Part2: Found {} results", results.len());
+    // println!("Part2: Maximum is {}", results.iter().max().unwrap());
 }

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::convert::TryFrom;
 
-pub fn parse_program(input: &str) -> Result<Vec<i32>, std::num::ParseIntError> {
+pub fn parse_program(input: &str) -> Result<Vec<i64>, std::num::ParseIntError> {
     input.split(',').map(|s| s.parse()).collect()
 }
 
@@ -19,7 +19,7 @@ pub enum Opcode {
     Err,
 }
 
-type Memory = Vec<i32>;
+type Memory = Vec<i64>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Param {
@@ -61,9 +61,9 @@ impl TryFrom<&str> for IntComputer {
     }
 }
 
-impl TryFrom<i32> for Param {
+impl TryFrom<i64> for Param {
     type Error = &'static str;
-    fn try_from(val: i32) -> Result<Self, Self::Error> {
+    fn try_from(val: i64) -> Result<Self, Self::Error> {
         match val {
             0 => Ok(Param::Pos),
             1 => Ok(Param::Imm),
@@ -77,8 +77,8 @@ pub struct IntComputer {
     mem: Memory,
     pc: usize,
     state: IntComputerState,
-    input: VecDeque<i32>,
-    output: VecDeque<i32>,
+    input: VecDeque<i64>,
+    output: VecDeque<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -97,7 +97,7 @@ struct Instruction {
 }
 
 impl IntComputer {
-    pub fn new(prog: Vec<i32>) -> Self {
+    pub fn new(prog: Vec<i64>) -> Self {
         IntComputer {
             mem: prog.to_owned(),
             pc: 0,
@@ -107,7 +107,7 @@ impl IntComputer {
         }
     }
 
-    pub fn get_output(&mut self) -> Option<i32> {
+    pub fn get_output(&mut self) -> Option<i64> {
         match self.output.front() {
             Some(x) => Some(*x),
             None => None,
@@ -118,7 +118,7 @@ impl IntComputer {
         self.state
     }
 
-    pub fn push_input(&mut self, value: i32) {
+    pub fn push_input(&mut self, value: i64) {
         self.input.push_back(value);
     }
 
@@ -261,7 +261,7 @@ impl IntComputer {
         Ok(inst.op)
     }
 
-    fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&i32, String> {
+    fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&i64, String> {
         if index > self.mem.len() {
             return Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
@@ -283,7 +283,7 @@ impl IntComputer {
         }
     }
 
-    fn try_store_at(&mut self, value: i32, index: usize) -> Result<(), String> {
+    fn try_store_at(&mut self, value: i64, index: usize) -> Result<(), String> {
         if index > self.mem.len() {
             Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
