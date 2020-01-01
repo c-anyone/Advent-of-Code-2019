@@ -124,38 +124,70 @@ pub fn day_7_run_part_2() {
     let int_computer: IntComputer = IntComputer::try_from(program.as_str()).unwrap();
     let mut best = 0;
     for input in phase_settings {
-        let mut amps: Vec<IntComputer> = Vec::new();
-        // create a list of computers, each with it's own state / separate copy
-        // and set the first input, phase setting
-        for &x in input.iter() {
-            let mut a = int_computer.clone();
-            a.push_input(x);
-            amps.push(a);
-        }
-
-        let mut signal = 0;
-
-        loop {
-            if amps
-                .iter_mut()
-                .map(|amp| {
-                    amp.push_input(signal);
-                    amp.run().unwrap();
-                    signal = amp.get_output().unwrap();
-                    amp
-                })
-                .all(|x| x.get_state() == IntComputerState::Stopped)
-            {
-                println!("Input: {:?} Signal strength {}", input, signal);
-                break;
-            }
-        }
-        if signal > best {
-            println!("New Best found! {} > {}", signal, best);
-            best = signal;
+        let result = run_amp_simulation(&int_computer, &input);
+        if result > best {
+            println!("New Best found! {} > {}", result, best);
+            best = result;
         }
     }
     println!("Best Setting is {}", best);
     // println!("Part2: Found {} results", results.len());
     // println!("Part2: Maximum is {}", results.iter().max().unwrap());
+}
+
+fn run_amp_simulation(program: &IntComputer, setting: &[i64]) -> i64 {
+    let mut amps: Vec<IntComputer> = Vec::new();
+    // create a list of computers, each with it's own state / separate copy
+    // and set the first input, phase setting
+    for &x in setting.iter() {
+        let mut a = program.clone();
+        a.push_input(x);
+        amps.push(a);
+    }
+
+    let mut signal = 0;
+    let mut cnt = 0;
+
+    loop {
+        for amp in amps.iter_mut() {
+            amp.push_input(signal);
+            amp.run().unwrap();
+            signal = amp.get_output().unwrap();
+        }
+        cnt += 1;
+        if amps
+            .iter()
+            .all(|x| x.get_state() == IntComputerState::Stopped)
+        {
+            println!(
+                "Input: {:?} Signal strength {}, iterations {}",
+                setting, signal, cnt
+            );
+            break;
+        }
+    }
+
+    signal
+}
+
+#[cfg(test)]
+mod Test {
+    use super::*;
+    #[test]
+    fn test_day_2_1() {
+        let input = "3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5";
+        let program = IntComputer::try_from(input).unwrap();
+
+        let result = run_amp_simulation(&program, &[9,8,7,6,5]);
+        assert_eq!(result, 139629729);
+    }
+
+    #[test]
+    fn test_day_2_2() {
+        let input = "3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10";
+        let program = IntComputer::try_from(input).unwrap();
+
+        let result = run_amp_simulation(&program, &[9,7,8,5,6]);
+        assert_eq!(result, 18216);
+    }
 }

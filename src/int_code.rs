@@ -108,10 +108,7 @@ impl IntComputer {
     }
 
     pub fn get_output(&mut self) -> Option<i64> {
-        match self.output.front() {
-            Some(x) => Some(*x),
-            None => None,
-        }
+        self.output.pop_front()
     }
 
     pub fn get_state(&self) -> IntComputerState {
