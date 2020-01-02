@@ -3,13 +3,28 @@ use std::convert::TryFrom;
 use std::io::{prelude::*, BufReader};
 use std::fs::File;
 
-pub fn day_9_run() -> std::io::Result<()> {
+pub fn day_9_run_part1() -> std::io::Result<()> {
     let file = File::open("puzzle_input.txt")?;
     let mut input = String::new();
     BufReader::new(file).read_to_string(&mut input)?;
 
     let mut program = IntComputer::try_from(input.as_str()).unwrap();
     program.push_input(1);
+    program.run().unwrap();
+
+    let result = program.get_output().unwrap();
+
+    println!("BOOST keycode {}", result);
+    Ok(())
+}
+
+pub fn day_9_run_part2() -> std::io::Result<()> {
+    let file = File::open("puzzle_input.txt")?;
+    let mut input = String::new();
+    BufReader::new(file).read_to_string(&mut input)?;
+
+    let mut program = IntComputer::try_from(input.as_str()).unwrap();
+    program.push_input(2);
     program.run().unwrap();
 
     let result = program.get_output().unwrap();

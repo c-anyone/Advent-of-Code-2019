@@ -110,6 +110,8 @@ fn timed<T>(f: impl FnOnce() -> T) -> (T, Duration) {
 
 fn main() {
     println!("------------ Day 9 ------------");
-    let (_, dur) = timed(move || day_9::day_9_run());
+    let (_, dur) = timed(move || day_9::day_9_run_part1());
+    println!("Time {:?}", dur);
+    let (_, dur) = timed(move || day_9::day_9_run_part2());
     println!("Time {:?}", dur);
 }

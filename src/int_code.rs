@@ -21,7 +21,7 @@ pub enum Opcode {
     Err,
 }
 
-pub type ValueType = i128;
+pub type ValueType = i64;
 type Memory = Vec<ValueType>;
 
 #[derive(Debug, Clone, Copy)]
