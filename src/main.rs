@@ -94,50 +94,22 @@ This time, when the TEST diagnostic program runs its input instruction to get th
 
 What is the diagnostic code for system ID 5?
 */
-use std::convert::TryFrom;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::time::{Duration, Instant};
 
 mod int_code;
-use int_code::*;
-
-mod day_7;
 mod day_9;
 
-fn day_5_run() {
-    let reader = BufReader::new(File::open("input_day5_part1.txt").expect("File not found!"));
-    let mut buf = String::new();
-    for line in reader.lines() {
-        let line = line.unwrap();
-        buf.push_str(&line);
-    }
-    // let mut buf = String::from("1,9,10,3,2,3,11,0,99,30,40,50");
-    let mut int_computer: IntComputer = IntComputer::try_from(buf.as_str()).unwrap();
-    int_computer.push_input(1);
-    match int_computer.run() {
-        // Ok(IntComputerState::Stopped) => println!("Input 1 OK"),
-        Ok(IntComputerState::Stopped) => println!("Output: {}", int_computer.get_output().unwrap()),
-        Err(x) => println!("{}", x),
-        Ok(_) => println!("Shouldn be here", ),
-    }
-
-    let mut int_computer: IntComputer = IntComputer::try_from(buf.as_str()).unwrap();
-    int_computer.push_input(5);
-    match int_computer.run() {
-        // Ok(None) => println!("Input 5 OK"),
-        Ok(IntComputerState::Stopped) => println!("Output: {}", int_computer.get_output().unwrap()),
-        Err(x) => println!("{}", x),
-        Ok(_) => println!("Shouldn be here", ),
-    }
+#[inline(always)]
+fn timed<T>(f: impl FnOnce() -> T) -> (T, Duration) {
+    let start = Instant::now();
+    let result = f();
+    let end = Instant::now();
+    (result, end - start)
 }
 
 
 fn main() {
-    println!("------------ Day 5 ------------");
-    day_5_run();
-    println!("------------ Day 7 ------------");
-    // day_7::day_7_run_part_1();
-    // day_7::day_7_run_part_2();
     println!("------------ Day 9 ------------");
-    day_9::day_9_run();
+    let (_, dur) = timed(move || day_9::day_9_run());
+    println!("Time {:?}", dur);
 }
