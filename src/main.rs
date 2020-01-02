@@ -134,8 +134,10 @@ fn day_5_run() {
 
 fn main() {
     println!("------------ Day 5 ------------");
-    day_5_run();
+    // day_5_run();
     println!("------------ Day 7 ------------");
-    day_7::day_7_run_part_1();
-    day_7::day_7_run_part_2();
+    // day_7::day_7_run_part_1();
+    // day_7::day_7_run_part_2();
+    println!("------------ Day 9 ------------");
+    day_9::day_9_run();
 }

@@ -1,13 +1,14 @@
 extern crate num_bigint;
-// extern crate num_trais;
+extern crate num_traits;
 
-// use num_bigint::BigInt
+use num_bigint::{BigInt, ToBigInt};
+use num_traits::{Zero, ToPrimitive};
 use std::collections::VecDeque;
 use itertools::zip;
 use std::convert::TryFrom;
 
 pub fn parse_program(input: &str) -> Result<Vec<i128>, std::num::ParseIntError> {
-    input.split(',').map(|s| s.parse()).collect()
+    input.trim().split(',').map(|s| s.parse()).collect()
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +26,7 @@ pub enum Opcode {
     Err,
 }
 
-type Memory = Vec<i128>;
+type Memory = Vec<BigInt>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Param {
@@ -112,10 +113,12 @@ impl IntComputer {
     pub fn new(prog: Vec<i128>) -> Self {
         // reserve MUCH more memory than needed
         // let mut mem: Vec<i128> = prog.iter().map(|i| *i).collect();
-        let mut mem = Vec::with_capacity(MEMSIZE);
-        mem.extend([0; MEMSIZE].iter());
+        let mut mem: Memory = Vec::with_capacity(MEMSIZE);
+        for _ in 0..MEMSIZE {
+            mem.push(Zero::zero());
+        }
 
-        zip(prog.iter(), mem.iter_mut()).for_each(|(p, m)| *m = *p);
+        zip(prog.iter(), mem.iter_mut()).for_each(|(p, m)| *m = p.to_bigint().unwrap());
 
         IntComputer {
             mem: mem,
@@ -128,7 +131,10 @@ impl IntComputer {
     }
 
     pub fn get_output(&mut self) -> Option<i128> {
-        self.output.pop_front()
+        match self.output.pop_front(){
+            Some(x) => x.to_i128(),
+            None => None
+        }
     }
 
     pub fn get_state(&self) -> IntComputerState {
@@ -157,24 +163,25 @@ impl IntComputer {
 
     pub fn step(&mut self) -> Result<Opcode, String> {
         let inst = self.get_instruction()?;
+        let mut iter = inst.params.iter();
         self.state = IntComputerState::Running;
         let result = match inst.op {
             Opcode::Add => {
-                let &i1 = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                let &i2 = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
-                let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
+                let i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                let i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?.clone();
+                let out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?.clone();
 
-                self.try_store_at(i1 + i2, out as usize)?;
+                self.try_store_at(i1 + i2, out.to_usize().unwrap())?;
                 self.pc += inst.op.len();
 
                 Ok(true)
             }
             Opcode::Mult => {
-                let &i1 = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                let &i2 = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
-                let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
+                let i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                let i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?.clone();
+                let out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?.clone();
 
-                self.try_store_at(i1 * i2, out as usize)?;
+                self.try_store_at(i1 * i2, out.to_usize().unwrap())?;
                 self.pc += inst.op.len();
                 Ok(true)
             }
@@ -185,15 +192,15 @@ impl IntComputer {
                     Ok(false)
                 } else {
                     let val = self.input.pop_front().unwrap();
-                    let &loc = self.try_get_param_ref(Param::Imm, self.pc + 1).unwrap();
-                    self.try_store_at(val, loc as usize)?;
+                    let loc = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1).unwrap().clone();
+                    self.try_store_at(val.to_bigint().unwrap(), loc.to_usize().unwrap())?;
                     self.pc += inst.op.len();
                     Ok(true)
                 }
             }
             Opcode::Output => {
-                let &out = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                self.output.push_back(out);
+                let out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                self.output.push_back(out.to_i128().unwrap());
                 // println!("Output: {}", out);
                 self.pc += inst.op.len();
                 Ok(true)
@@ -203,10 +210,10 @@ impl IntComputer {
                 Ok(false)
             }
             Opcode::JumpTrue => {
-                let &input = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                if input != 0 {
-                    let &new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
-                    if new_pc as usize > self.mem.len() {
+                let input = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                if input != Zero::zero() {
+                    let new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?.clone();
+                    if new_pc.to_usize().unwrap() > self.mem.len() {
                         return Err(format!(
                             "New PC {} @ {} not valid, len {}",
                             new_pc,
@@ -214,17 +221,17 @@ impl IntComputer {
                             self.mem.len()
                         ));
                     }
-                    self.pc = new_pc as usize;
+                    self.pc = new_pc.to_usize().unwrap();
                 } else {
                     self.pc += inst.op.len();
                 }
                 Ok(true)
             }
             Opcode::JumpFalse => {
-                let &input = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                if input == 0 {
-                    let &new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
-                    if new_pc as usize > self.mem.len() {
+                let input = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                if input == Zero::zero() {
+                    let new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?.clone();
+                    if new_pc.to_usize().unwrap() > self.mem.len() {
                         return Err(format!(
                             "New PC {} @ {} not valid, len {}",
                             new_pc,
@@ -232,29 +239,29 @@ impl IntComputer {
                             self.mem.len()
                         ));
                     }
-                    self.pc = new_pc as usize;
+                    self.pc = new_pc.to_usize().unwrap();
                 } else {
                     self.pc += inst.op.len();
                 }
                 Ok(true)
             }
             Opcode::LessThan => {
-                let &i1 = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                let &i2 = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
-                let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
+                let i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                let i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?.clone();
+                let out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?.clone();
 
                 let res = if i1 < i2 { 1 } else { 0 };
-                self.try_store_at(res, out as usize)?;
+                self.try_store_at(res.to_bigint().unwrap(), out.to_usize().unwrap())?;
                 self.pc += inst.op.len();
                 Ok(true)
             }
             Opcode::Equals => {
-                let &i1 = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                let &i2 = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
-                let &out = self.try_get_param_ref(Param::Imm, self.pc + 3)?;
+                let i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                let i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?.clone();
+                let out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?.clone();
 
                 let res = if i1 == i2 { 1 } else { 0 };
-                self.try_store_at(res, out as usize)?;
+                self.try_store_at(res.to_bigint().unwrap(), out.to_usize().unwrap())?;
                 self.pc += inst.op.len();
                 Ok(true)
             }
@@ -264,8 +271,8 @@ impl IntComputer {
             )),
 
             Opcode::SetRel => {
-                let &base = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
-                self.rel_base = base as usize;
+                let base = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
+                self.rel_base += base.to_usize().unwrap();
                 self.pc += inst.op.len();
 
                 Ok(true)
@@ -280,7 +287,7 @@ impl IntComputer {
         Ok(inst.op)
     }
 
-    fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&i128, String> {
+    fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&BigInt, String> {
         if index > self.mem.len() {
             return Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
@@ -290,8 +297,8 @@ impl IntComputer {
         match p {
             Param::Imm => Ok(self.mem.get(index).unwrap()),
             Param::Pos => {
-                let location = *self.mem.get(index).unwrap() as usize;
-                match self.mem.get(location) {
+                let location = self.mem.get(index).unwrap();
+                match self.mem.get(location.to_usize().unwrap()) {
                     Some(x) => Ok(x),
                     None => Err(format!(
                         "Halted @ {:04} :Index {} @ {} out of bounds",
@@ -300,8 +307,8 @@ impl IntComputer {
                 }
             }
             Param::Rel => {
-                let offset = *self.mem.get(index).unwrap() as usize;
-                match self.mem.get(self.rel_base + offset) {
+                let offset = self.mem.get(index).unwrap().to_isize().unwrap();
+                match self.mem.get((self.rel_base as isize + offset) as usize) {
                     Some(x) => Ok(x),
                     None => Err(format!(
                         "Halted @ {:04} Offset {} base {}",
@@ -312,7 +319,7 @@ impl IntComputer {
         }
     }
 
-    fn try_store_at(&mut self, value: i128, index: usize) -> Result<(), String> {
+    fn try_store_at(&mut self, value: BigInt, index: usize) -> Result<(), String> {
         if index > self.mem.len() {
             Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
@@ -332,7 +339,7 @@ impl IntComputer {
                 self.mem.len()
             ));
         }
-        let &x = self.mem.get(self.pc).unwrap();
+        let x = self.mem.get(self.pc).unwrap().to_i128().unwrap();
         let op = if x > 99 { x % 100 } else { x };
         let mut params = x / 100;
 

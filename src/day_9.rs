@@ -1,5 +1,22 @@
 use crate::int_code::{IntComputer, IntComputerState};
 use std::convert::TryFrom;
+use std::io::{prelude::*, BufRead, BufReader};
+use std::fs::File;
+
+pub fn day_9_run() -> std::io::Result<()> {
+    let file = File::open("puzzle_input.txt")?;
+    let mut input = String::new();
+    let length = BufReader::new(file).read_to_string(&mut input)?;
+
+    let mut program = IntComputer::try_from(input.as_str()).unwrap();
+    program.push_input(1);
+    program.run().unwrap();
+
+    let result = program.get_output().unwrap();
+
+    println!("BOOST keycode {}", result);
+    Ok(())
+}
 
 #[cfg(test)]
 mod Test {
@@ -10,12 +27,15 @@ mod Test {
         let mut program = IntComputer::try_from(input).unwrap();
 
         program.run().unwrap();
-        let mut result = String::new();
+        let mut result = Vec::new();
         while let Some(x) = program.get_output() {
-            result += format!{"{},", x}.as_str();
+            // result += format! {"{},", x}.as_str();
+            result.push(x);
         }
-
-        assert_eq!(result, input);
+        println!("{:?}", result);
+        result.pop();
+        let inx: Vec<i128> = input.split(',').map(|x| x.parse::<i128>().unwrap()).collect();
+        assert_eq!(result, inx);
     }
 
     #[test]
@@ -26,9 +46,13 @@ mod Test {
         program.run().unwrap();
 
         let result = program.get_output().unwrap();
+
+        let digits = result.to_string().len();
+
         println!("Digit Result: {}", result);
 
-
+        assert_eq!(result, 1219070632396864);
+        assert_eq!(digits, 16);
     }
 
     #[test]
