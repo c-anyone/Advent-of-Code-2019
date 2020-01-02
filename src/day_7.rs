@@ -89,7 +89,7 @@ use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use crate::int_code::{IntComputer, IntComputerState};
+use crate::int_code::{IntComputer, IntComputerState, ValueType};
 // use int_code::IntComputer;
 
 pub fn day_7_run_part_1() {
@@ -135,7 +135,7 @@ pub fn day_7_run_part_2() {
     // println!("Part2: Maximum is {}", results.iter().max().unwrap());
 }
 
-fn run_amp_simulation(program: &IntComputer, setting: &[i128]) -> i128 {
+fn run_amp_simulation(program: &IntComputer, setting: &[ValueType]) -> ValueType {
     let mut amps: Vec<IntComputer> = Vec::new();
     // create a list of computers, each with it's own state / separate copy
     // and set the first input, phase setting

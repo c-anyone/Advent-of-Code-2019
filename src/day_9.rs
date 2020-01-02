@@ -1,4 +1,4 @@
-use crate::int_code::{IntComputer, IntComputerState};
+use crate::int_code::{IntComputer, IntComputerState, ValueType};
 use std::convert::TryFrom;
 use std::io::{prelude::*, BufRead, BufReader};
 use std::fs::File;
@@ -34,7 +34,7 @@ mod Test {
         }
         println!("{:?}", result);
         result.pop();
-        let inx: Vec<i128> = input.split(',').map(|x| x.parse::<i128>().unwrap()).collect();
+        let inx: Vec<ValueType> = input.split(',').map(|x| x.parse::<ValueType>().unwrap()).collect();
         assert_eq!(result, inx);
     }
 
