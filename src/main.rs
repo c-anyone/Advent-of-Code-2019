@@ -94,8 +94,6 @@ This time, when the TEST diagnostic program runs its input instruction to get th
 
 What is the diagnostic code for system ID 5?
 */
-#![feature(test)]
-extern crate test;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -103,9 +101,8 @@ use std::io::{BufRead, BufReader};
 mod int_code;
 use int_code::*;
 
-mod day_6;
-// use day_6;
 mod day_7;
+mod day_9;
 
 fn day_5_run() {
     let reader = BufReader::new(File::open("input_day5_part1.txt").expect("File not found!"));
@@ -118,7 +115,7 @@ fn day_5_run() {
     let mut int_computer: IntComputer = IntComputer::try_from(buf.as_str()).unwrap();
     int_computer.push_input(1);
     match int_computer.run() {
-        // Ok(IntComputerState::Stopped) => println!("Input 1 OK"),        
+        // Ok(IntComputerState::Stopped) => println!("Input 1 OK"),
         Ok(IntComputerState::Stopped) => println!("Output: {}", int_computer.get_output().unwrap()),
         Err(x) => println!("{}", x),
         Ok(_) => println!("Shouldn be here", ),
@@ -134,15 +131,10 @@ fn day_5_run() {
     }
 }
 
-fn day_6_run() {
-    day_6::run();
-}
 
 fn main() {
     println!("------------ Day 5 ------------");
-    // day_5_run();
-    println!("------------ Day 6 ------------");
-    day_6_run();
+    day_5_run();
     println!("------------ Day 7 ------------");
     day_7::day_7_run_part_1();
     day_7::day_7_run_part_2();

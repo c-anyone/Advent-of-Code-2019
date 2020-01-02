@@ -135,7 +135,7 @@ pub fn day_7_run_part_2() {
     // println!("Part2: Maximum is {}", results.iter().max().unwrap());
 }
 
-fn run_amp_simulation(program: &IntComputer, setting: &[i64]) -> i64 {
+fn run_amp_simulation(program: &IntComputer, setting: &[i128]) -> i128 {
     let mut amps: Vec<IntComputer> = Vec::new();
     // create a list of computers, each with it's own state / separate copy
     // and set the first input, phase setting

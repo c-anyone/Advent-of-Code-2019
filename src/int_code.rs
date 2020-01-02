@@ -1,7 +1,12 @@
+extern crate num_bigint;
+// extern crate num_trais;
+
+// use num_bigint::BigInt
 use std::collections::VecDeque;
+use itertools::zip;
 use std::convert::TryFrom;
 
-pub fn parse_program(input: &str) -> Result<Vec<i64>, std::num::ParseIntError> {
+pub fn parse_program(input: &str) -> Result<Vec<i128>, std::num::ParseIntError> {
     input.split(',').map(|s| s.parse()).collect()
 }
 
@@ -16,15 +21,17 @@ pub enum Opcode {
     JumpFalse,
     LessThan,
     Equals,
+    SetRel,
     Err,
 }
 
-type Memory = Vec<i64>;
+type Memory = Vec<i128>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Param {
     Pos,
     Imm,
+    Rel,
 }
 
 impl Opcode {
@@ -39,6 +46,7 @@ impl Opcode {
             Opcode::LessThan => 4,
             Opcode::Equals => 4,
             Opcode::Stop => 0,
+            Opcode::SetRel => 2,
             Opcode::Err => 0,
         }
     }
@@ -61,12 +69,13 @@ impl TryFrom<&str> for IntComputer {
     }
 }
 
-impl TryFrom<i64> for Param {
+impl TryFrom<i128> for Param {
     type Error = &'static str;
-    fn try_from(val: i64) -> Result<Self, Self::Error> {
+    fn try_from(val: i128) -> Result<Self, Self::Error> {
         match val {
             0 => Ok(Param::Pos),
             1 => Ok(Param::Imm),
+            2 => Ok(Param::Rel),
             _ => Err("invalid param value"),
         }
     }
@@ -76,9 +85,10 @@ impl TryFrom<i64> for Param {
 pub struct IntComputer {
     mem: Memory,
     pc: usize,
+    rel_base: usize,
     state: IntComputerState,
-    input: VecDeque<i64>,
-    output: VecDeque<i64>,
+    input: VecDeque<i128>,
+    output: VecDeque<i128>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -96,18 +106,28 @@ struct Instruction {
     params: Vec<Param>,
 }
 
+const MEMSIZE: usize = 1024*1024;
+
 impl IntComputer {
-    pub fn new(prog: Vec<i64>) -> Self {
+    pub fn new(prog: Vec<i128>) -> Self {
+        // reserve MUCH more memory than needed
+        // let mut mem: Vec<i128> = prog.iter().map(|i| *i).collect();
+        let mut mem = Vec::with_capacity(MEMSIZE);
+        mem.extend([0; MEMSIZE].iter());
+
+        zip(prog.iter(), mem.iter_mut()).for_each(|(p, m)| *m = *p);
+
         IntComputer {
-            mem: prog.to_owned(),
+            mem: mem,
             pc: 0,
+            rel_base: 0,
             state: IntComputerState::Initialized,
             input: VecDeque::new(),
             output: VecDeque::new(),
         }
     }
 
-    pub fn get_output(&mut self) -> Option<i64> {
+    pub fn get_output(&mut self) -> Option<i128> {
         self.output.pop_front()
     }
 
@@ -115,7 +135,7 @@ impl IntComputer {
         self.state
     }
 
-    pub fn push_input(&mut self, value: i64) {
+    pub fn push_input(&mut self, value: i128) {
         self.input.push_back(value);
     }
 
@@ -131,12 +151,6 @@ impl IntComputer {
                 // Created => (),
                 Err => (),
             };
-            // return match x {
-            //     Ok(Opcode::Input) => Ok(IntComputerState::Halted),
-            //     Ok(Opcode::Output) => Ok(Some(self.get_output().unwrap())),
-            //     Ok(_x) => continue,
-            //     Err(x)=> Err(format!("Execution halted with an Error {}", x)),
-            // };
         }
         Ok(self.state)
     }
@@ -248,6 +262,14 @@ impl IntComputer {
                 "Invalid Opcode {} @ {}",
                 self.mem[self.pc], self.pc
             )),
+
+            Opcode::SetRel => {
+                let &base = self.try_get_param_ref(inst.params[0], self.pc + 1)?;
+                self.rel_base = base as usize;
+                self.pc += inst.op.len();
+
+                Ok(true)
+            }
             _ => {
                 return Err(format!(
                     "Not Implemented Instruction {} @ {}",
@@ -258,7 +280,7 @@ impl IntComputer {
         Ok(inst.op)
     }
 
-    fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&i64, String> {
+    fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&i128, String> {
         if index > self.mem.len() {
             return Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
@@ -277,10 +299,20 @@ impl IntComputer {
                     )),
                 }
             }
+            Param::Rel => {
+                let offset = *self.mem.get(index).unwrap() as usize;
+                match self.mem.get(self.rel_base + offset) {
+                    Some(x) => Ok(x),
+                    None => Err(format!(
+                        "Halted @ {:04} Offset {} base {}",
+                        self.pc, offset, self.rel_base
+                    )),
+                }
+            }
         }
     }
 
-    fn try_store_at(&mut self, value: i64, index: usize) -> Result<(), String> {
+    fn try_store_at(&mut self, value: i128, index: usize) -> Result<(), String> {
         if index > self.mem.len() {
             Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
@@ -313,6 +345,7 @@ impl IntComputer {
             6 => Opcode::JumpFalse,
             7 => Opcode::LessThan,
             8 => Opcode::Equals,
+            9 => Opcode::SetRel,
             99 => Opcode::Stop,
             _ => Opcode::Err,
         };
