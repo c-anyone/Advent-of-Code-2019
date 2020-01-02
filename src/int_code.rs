@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use itertools::zip;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 pub fn parse_program(input: &str) -> Result<Vec<ValueType>, std::num::ParseIntError> {
     input.trim().split(',').map(|s| s.parse()).collect()
@@ -21,7 +21,7 @@ pub enum Opcode {
     Err,
 }
 
-pub type ValueType = i64;
+pub type ValueType = i128;
 type Memory = Vec<ValueType>;
 
 #[derive(Debug, Clone, Copy)]
@@ -95,7 +95,6 @@ pub enum IntComputerState {
     Running,
     Halted,
     Stopped,
-    Err,
 }
 
 struct Instruction {
@@ -146,8 +145,6 @@ impl IntComputer {
                 Initialized => (),
                 Running => (),
                 Halted | Stopped => break,
-                // Created => (),
-                Err => (),
             };
         }
         Ok(self.state)
@@ -157,23 +154,29 @@ impl IntComputer {
         let inst = self.get_instruction()?;
         let mut iter = inst.params.iter();
         self.state = IntComputerState::Running;
-        let result = match inst.op {
+        let _ = match inst.op {
             Opcode::Add => {
-                let &i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?;
-                let &i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?;
-                let &out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?;
+                let &i1 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let &i2 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 2)?;
+                let out = self.try_get_mem_ref_mut(*iter.next().unwrap(), self.pc + 3)?;
 
-                self.try_store_at(i1 + i2, out.try_into().unwrap())?;
+                let (result, overflow) = i1.overflowing_add(i2);
+                *out = i1.saturating_add(i2);
+
+                if overflow {
+                    println!("Overflow @ {} -> {} + {}", self.pc, i1, i2);
+                }
+                // self.try_store_at(i1 + i2, out.try_into().unwrap())?;
                 self.pc += inst.op.len();
 
                 Ok(true)
             }
             Opcode::Mult => {
-                let &i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?;
-                let &i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?;
-                let &out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?;
-
-                self.try_store_at(i1 * i2, out.try_into().unwrap())?;
+                let &i1 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let &i2 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 2)?;
+                let out = self.try_get_mem_ref_mut(*iter.next().unwrap(), self.pc + 3)?;
+                *out = i1.saturating_mul(i2);
+                // self.try_store_at(i1 * i2, out.try_into().unwrap())?;
                 self.pc += inst.op.len();
                 Ok(true)
             }
@@ -184,14 +187,15 @@ impl IntComputer {
                     Ok(false)
                 } else {
                     let val = self.input.pop_front().unwrap();
-                    let loc = *self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1).unwrap() as usize;
-                    self.try_store_at(val, loc)?;
+                    let loc = self.try_get_mem_ref_mut(*iter.next().unwrap(), self.pc + 1).unwrap();
+                    *loc = val;
+
                     self.pc += inst.op.len();
                     Ok(true)
                 }
             }
             Opcode::Output => {
-                let &out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let &out = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
                 self.output.push_back(out);
                 // println!("Output: {}", out);
                 self.pc += inst.op.len();
@@ -202,9 +206,9 @@ impl IntComputer {
                 Ok(false)
             }
             Opcode::JumpTrue => {
-                let &input = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let &input = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
                 if input != 0 {
-                    let &new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
+                    let &new_pc = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 2)?;
                     let new_pc = new_pc as usize;
                     if new_pc > self.mem.len() {
                         return Err(format!(
@@ -221,9 +225,9 @@ impl IntComputer {
                 Ok(true)
             }
             Opcode::JumpFalse => {
-                let &input = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let &input = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
                 if input == 0 {
-                    let &new_pc = self.try_get_param_ref(inst.params[1], self.pc + 2)?;
+                    let &new_pc = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 2)?;
                     let new_pc = new_pc as usize;
                     if new_pc > self.mem.len() {
                         return Err(format!(
@@ -240,22 +244,22 @@ impl IntComputer {
                 Ok(true)
             }
             Opcode::LessThan => {
-                let i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?;
-                let i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?;
-                let out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?;
+                let &i1 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let &i2 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 2)?;
+                let out = self.try_get_mem_ref_mut(*iter.next().unwrap(), self.pc + 3)?;
 
                 let res = if i1 < i2 { 1 } else { 0 };
-                self.try_store_at(res, *out as usize)?;
+                *out = res;
                 self.pc += inst.op.len();
                 Ok(true)
             }
             Opcode::Equals => {
-                let i1 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)?.clone();
-                let i2 = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 2)?.clone();
-                let out = self.try_get_param_ref(*iter.next().unwrap(), self.pc + 3)?.clone();
+                let &i1 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let &i2 = self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 2)?;
+                let out = self.try_get_mem_ref_mut(*iter.next().unwrap(), self.pc + 3)?;
 
                 let res = if i1 == i2 { 1 } else { 0 };
-                self.try_store_at(res, out as usize)?;
+                *out = res;
                 self.pc += inst.op.len();
                 Ok(true)
             }
@@ -265,23 +269,18 @@ impl IntComputer {
             )),
 
             Opcode::SetRel => {
-                let base = *self.try_get_param_ref(*iter.next().unwrap(), self.pc + 1)? as usize;
-                self.rel_base += base;
+                let base = *self.try_get_mem_ref(*iter.next().unwrap(), self.pc + 1)?;
+                let rl = self.rel_base as ValueType;
+                self.rel_base = (base + rl) as usize;
                 self.pc += inst.op.len();
 
                 Ok(true)
-            }
-            _ => {
-                return Err(format!(
-                    "Not Implemented Instruction {} @ {}",
-                    self.mem[self.pc], self.pc
-                ))
             }
         };
         Ok(inst.op)
     }
 
-    fn try_get_param_ref(&self, p: Param, index: usize) -> Result<&ValueType, String> {
+    fn try_get_mem_ref(&self, p: Param, index: usize) -> Result<&ValueType, String> {
         if index > self.mem.len() {
             return Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
@@ -301,6 +300,7 @@ impl IntComputer {
                 }
             }
             Param::Rel => {
+                // Relative means the value at pc+n is to be added to rel_base and this value is accessed
                 let offset = *self.mem.get(index).unwrap() as isize;
                 match self.mem.get((self.rel_base as isize + offset) as usize) {
                     Some(x) => Ok(x),
@@ -313,17 +313,50 @@ impl IntComputer {
         }
     }
 
-    fn try_store_at(&mut self, value: ValueType, index: usize) -> Result<(), String> {
+    fn try_get_mem_ref_mut(&mut self, p: Param, index: usize) -> Result<&mut ValueType, String> {
         if index > self.mem.len() {
-            Err(format!(
+            return Err(format!(
                 "Halted @ {:04} :Index {} out of bounds",
-                self.pc, index
-            ))
-        } else {
-            self.mem[index] = value;
-            Ok(())
+                self.pc, index,
+            ));
+        }
+        match p {
+            Param::Imm => Ok(self.mem.get_mut(index).unwrap()),
+            Param::Pos => {
+                let location = *self.mem.get(index).unwrap() as usize;
+                match self.mem.get_mut(location) {
+                    Some(x) => Ok(x),
+                    None => Err(format!(
+                        "Halted @ {:04} :Index {} @ {} out of bounds",
+                        self.pc, location, index
+                    )),
+                }
+            }
+            Param::Rel => {
+                // Relative means the value at pc+n is to be added to rel_base and this value is accessed
+                let offset = *self.mem.get(index).unwrap() as isize;
+                match self.mem.get_mut((self.rel_base as isize + offset) as usize) {
+                    Some(x) => Ok(x),
+                    None => Err(format!(
+                        "Halted @ {:04} Offset {} base {}",
+                        self.pc, offset, self.rel_base
+                    )),
+                }
+            }
         }
     }
+
+    // fn try_store_at(&mut self, value: ValueType, index: usize) -> Result<(), String> {
+    //     if index > self.mem.len() {
+    //         Err(format!(
+    //             "Halted @ {:04} :Index {} out of bounds",
+    //             self.pc, index
+    //         ))
+    //     } else {
+    //         self.mem[index] = value;
+    //         Ok(())
+    //     }
+    // }
 
     fn get_instruction(&self) -> Result<Instruction, String> {
         if self.pc > self.mem.len() {
